@@ -1,5 +1,5 @@
 /**
- * Client-Side Backup Sample Scenarios for GapLens
+ * Client-Side Backup Sample Scenarios & Precomputed Analyses for GapLens
  * Problem Statement: Digital Dark Spot (Shinchan Online Hackathon 2026)
  *
  * Ensures instant 1-click loading and zero-latency demonstration even if backend is offline.
@@ -130,3 +130,401 @@ export const FALLBACK_SCENARIOS = [
     ],
   },
 ];
+
+export const FALLBACK_ANALYSES = {
+  'scholarship-2026': {
+    readinessScore: 54,
+    readinessLabel: 'Moderate Risk — Critical Renewal Gaps & Income Limit Conflict',
+    executiveSummary:
+      'While core eligibility (state domicile) and online portal requirements are documented in the official notice, critical contradictions exist regarding the family income ceiling (Rs. 2.5 Lakh vs Rs. 8.0 Lakh) and required income proof format. Furthermore, multi-year renewal conditions are completely absent across all reviewed sources.',
+    expectedRubric: [
+      'Eligibility & Minimum Marks',
+      'Family Income Limit',
+      'Required Documents List',
+      'Application Mode & Portal',
+      'Current Submission Deadline',
+      'Annual Renewal & Attendance Policy',
+    ],
+    sourcedFacts: [
+      {
+        id: 'fact-1',
+        category: 'Domicile & Portal',
+        statement:
+          'Applicants must hold state domicile and submit applications online through the state scholarship portal.',
+        sourceIds: ['src-1'],
+        sourceTitles: ['Official State Scholarship Portal Guidelines'],
+        confidence: 'High (Official Source)',
+      },
+      {
+        id: 'fact-2',
+        category: 'Core Identity Documents',
+        statement:
+          'Aadhaar Card, previous qualifying marksheet, and bank passbook copy are mandatory attachments.',
+        sourceIds: ['src-1'],
+        sourceTitles: ['Official State Scholarship Portal Guidelines'],
+        confidence: 'High (Official Source)',
+      },
+      {
+        id: 'fact-3',
+        category: 'Degree Course Coverage',
+        statement:
+          'The State Post-Matric Scholarship covers eligible undergraduate degrees and professional engineering courses.',
+        sourceIds: ['src-2'],
+        sourceTitles: ['EduCareer Student Guidance Blog'],
+        confidence: 'Medium (Third-Party Guide)',
+      },
+      {
+        id: 'fact-4',
+        category: 'Hostel Allowance Snippet',
+        statement:
+          'Hostel students residing in recognized private hostels or PG accommodations may receive an additional monthly maintenance allowance.',
+        sourceIds: ['src-4'],
+        sourceTitles: ['Student Community Hostel Allowance FAQ'],
+        confidence: 'Low (Unverified Community Post)',
+      },
+    ],
+    informationGaps: [
+      {
+        id: 'gap-1',
+        title: 'Scholarship Renewal & Continuation Policy Missing',
+        missingQuestion:
+          'What minimum CGPA, attendance percentage, or backlog rules are required to renew the scholarship in Year 2, 3, and 4?',
+        impactLevel: 'Critical',
+        signalLabel: 'Potential Gap — Not Found in Reviewed Sources',
+        explanation:
+          'None of the 4 sources mention whether the scholarship auto-renews or requires fresh annual income verification.',
+      },
+      {
+        id: 'gap-2',
+        title: 'Exact Closing Deadline for 2026-27 Cycle Unspecified',
+        missingQuestion:
+          'What is the official last date for online submission for the 2026-27 academic year?',
+        impactLevel: 'High',
+        signalLabel: 'Potential Gap — Unanswered Question',
+        explanation:
+          'Source 1 references the 2026-27 cycle but omits the closing date; Source 3 lists a November 2023 deadline from an expired cycle.',
+      },
+      {
+        id: 'gap-3',
+        title: 'Hostel Maintenance Verification Protocol Undefined',
+        missingQuestion:
+          'Does claiming the monthly hostel allowance require a registered lease agreement, warden certificate, or official verification stamp?',
+        impactLevel: 'Medium',
+        signalLabel: 'Potential Gap — AI Signal',
+        explanation:
+          'Source 4 mentions a Rs. 1,200/month allowance in an undated snippet without citing a competent verification authority or official application form.',
+      },
+    ],
+    contradictions: [
+      {
+        id: 'conf-1',
+        parameter: 'Maximum Annual Family Income Limit',
+        severity: 'Critical Conflict',
+        signalLabel: 'Possible Conflict Between Sources',
+        sourceA: {
+          sourceId: 'src-1',
+          title: 'Official State Scholarship Portal Guidelines',
+          claim: 'Annual family income from all sources must not exceed Rs. 2,50,000.',
+        },
+        sourceB: {
+          sourceId: 'src-2',
+          title: 'EduCareer Student Guidance Blog',
+          claim: 'Students with a family income up to Rs. 8,00,000 per annum are eligible to apply.',
+        },
+        resolutionAdvice:
+          'Verify whether the Rs. 2.5 Lakh cap applies to specific categories while Rs. 8.0 Lakh applies to EBC/OBC tiers on the official portal.',
+      },
+      {
+        id: 'conf-2',
+        parameter: 'Income Proof Document Format',
+        severity: 'High Conflict',
+        signalLabel: 'Possible Conflict Between Sources',
+        sourceA: {
+          sourceId: 'src-1',
+          title: 'Official State Scholarship Portal Guidelines',
+          claim: 'Requires an official Income Certificate issued by the Tehsildar.',
+        },
+        sourceB: {
+          sourceId: 'src-2',
+          title: 'EduCareer Student Guidance Blog',
+          claim: 'States a self-attested income declaration on Rs. 100 stamp paper is sufficient.',
+        },
+        resolutionAdvice:
+          'Do not rely on a stamp-paper affidavit; apply for a Tehsildar-issued digital income certificate.',
+      },
+      {
+        id: 'conf-3',
+        parameter: 'Minimum Qualifying Marks & Submission Mode',
+        severity: 'Moderate Conflict',
+        signalLabel: 'Possible Conflict Between Sources',
+        sourceA: {
+          sourceId: 'src-1',
+          title: 'Official State Scholarship Portal Guidelines',
+          claim: 'Requires 75% marks and strictly online portal submission.',
+        },
+        sourceB: {
+          sourceId: 'src-3',
+          title: 'Regional Directorate Circular Archive',
+          claim: 'Requires offline hard-copy submission to the District Nodal Officer.',
+        },
+        resolutionAdvice:
+          'Source 3 is from the 2023-24 cycle; follow the online submission workflow in Source 1.',
+      },
+    ],
+    outdatedWarnings: [
+      {
+        id: 'time-1',
+        sourceId: 'src-3',
+        sourceTitle: 'Regional Directorate Circular Archive',
+        detectedDate: 'October 2023 (2023-24 Cycle)',
+        warningType: 'Outdated Cycle',
+        riskDescription:
+          'Refers to the 2023-24 academic cycle and offline submission procedures that have likely been superseded.',
+      },
+      {
+        id: 'time-2',
+        sourceId: 'src-4',
+        sourceTitle: 'Student FAQ Snippet',
+        detectedDate: 'Undated',
+        warningType: 'Missing Publication Date',
+        riskDescription:
+          'Claims a Rs. 1,200/month hostel allowance without citing a notification date or official circular number.',
+      },
+    ],
+    verificationChecklist: [
+      {
+        id: 'chk-1',
+        priority: 'High',
+        actionItem:
+          'Confirm the official 2026-27 online application deadline on the State Scholarship Portal notice board.',
+        targetAuthority: 'Official State Scholarship Portal',
+        reason: 'Closing date is missing in current guidelines and outdated in archived circulars.',
+      },
+      {
+        id: 'chk-2',
+        priority: 'High',
+        actionItem:
+          'Verify the exact family income limit (Rs. 2.5L vs Rs. 8.0L) and obtain a Tehsildar-issued Income Certificate.',
+        targetAuthority: 'Tehsildar Office / Official GR PDF',
+        reason: 'Direct contradiction between the official summary and third-party student blog.',
+      },
+      {
+        id: 'chk-3',
+        priority: 'Medium',
+        actionItem:
+          'Check the official scheme brochure for 2nd-year renewal criteria (minimum CGPA/attendance rules).',
+        targetAuthority: 'Directorate of Technical Education (DTE) Scheme FAQ',
+        reason: 'Renewal conditions are completely absent from all reviewed sources.',
+      },
+      {
+        id: 'chk-4',
+        priority: 'Low',
+        actionItem:
+          'Cross-check whether the Rs. 1,200/month hostel allowance requires a registered rent agreement or warden certificate.',
+        targetAuthority: 'College Scholarship Nodal Officer',
+        reason: 'Mentioned only in an undated student FAQ snippet.',
+      },
+    ],
+  },
+  'fssai-cloud-kitchen': {
+    readinessScore: 48,
+    readinessLabel: 'Moderate Risk — Turnover Discrepancy & Missing Fire Safety NOC',
+    executiveSummary:
+      'While basic FSSAI registration (Form A) is documented for home tiffins with turnover up to Rs. 12 Lakhs, conflicting PMC guidance claims a Rs. 20 Lakh threshold for State Licensing. Crucially, mandatory Fire Department NOC, commercial gas cylinder inspection, and Maharashtra Shop Act registration are either completely absent or referenced via an obsolete 2021 municipal circular.',
+    expectedRubric: [
+      'Turnover Threshold & FSSAI Category',
+      'Potable Water & Health Fitness Test',
+      'Municipal Health Trade License (PMC)',
+      'Fire Safety NOC & Commercial LPG Rules',
+      'Shop & Establishment Act Registration',
+      'Annual Renewal Window & Penalties',
+    ],
+    sourcedFacts: [
+      {
+        id: 'fact-1',
+        category: 'Basic FSSAI Registration',
+        statement:
+          'Home-based food operators and cloud kitchens with turnover up to Rs. 12 Lakhs require Basic FSSAI Registration (Form A) with kitchen layout and medical fitness certs.',
+        sourceIds: ['src-1'],
+        sourceTitles: ['Food Safety Authority Portal (FSSAI Registration Standard)'],
+        confidence: 'High (Official Source)',
+      },
+      {
+        id: 'fact-2',
+        category: 'Municipal Jurisdiction',
+        statement:
+          'Food delivery establishments operating in Pune Municipal Corporation limits require a Municipal Health Trade License and commercial meter.',
+        sourceIds: ['src-2'],
+        sourceTitles: ['Municipal Corporation Trade Licensing Advisory (PMC)'],
+        confidence: 'Medium (Municipal Advisory)',
+      },
+      {
+        id: 'fact-3',
+        category: 'FSSAI Renewal Schedule',
+        statement:
+          'Annual renewal of FSSAI registration must be submitted at least 30 days prior to certificate expiry.',
+        sourceIds: ['src-1'],
+        sourceTitles: ['Food Safety Authority Portal (FSSAI Registration Standard)'],
+        confidence: 'High (Official Source)',
+      },
+    ],
+    informationGaps: [
+      {
+        id: 'gap-1',
+        title: 'Fire Safety NOC & Commercial LPG Rules Missing for 2026',
+        missingQuestion:
+          'Does a home-based cloud kitchen in Pune require a mandatory Fire Department No-Objection Certificate (NOC) and commercial LPG cylinder connection under 2026 municipal safety norms?',
+        impactLevel: 'Critical',
+        signalLabel: 'Potential Gap — Not Found in Reviewed Sources',
+        explanation:
+          'Neither 2026 source specifies whether domestic LPG cylinders are legally prohibited or if residential fire inspections apply.',
+      },
+      {
+        id: 'gap-2',
+        title: 'Maharashtra Shop & Establishment Act (Gumasta) Status Missing',
+        missingQuestion:
+          'Is registration under the Maharashtra Shops and Establishments Act mandatory for single-operator residential cloud kitchens?',
+        impactLevel: 'High',
+        signalLabel: 'Potential Gap — Unanswered Question',
+        explanation:
+          'Commercial food sales generally require Gumasta registration, but this condition is completely omitted across all sources.',
+      },
+    ],
+    contradictions: [
+      {
+        id: 'conf-1',
+        parameter: 'Turnover Ceiling for Basic Registration vs State License',
+        severity: 'Critical Conflict',
+        signalLabel: 'Possible Conflict Between Sources',
+        sourceA: {
+          sourceId: 'src-1',
+          title: 'Food Safety Authority Portal (FSSAI Registration Standard)',
+          claim: 'Turnover up to Rs. 12 Lakhs requires Basic FSSAI Registration (Form A).',
+        },
+        sourceB: {
+          sourceId: 'src-2',
+          title: 'Municipal Corporation Trade Licensing Advisory (PMC)',
+          claim: 'Turnover exceeding Rs. 20 Lakhs or connected load >5KW triggers State FSSAI License.',
+        },
+        resolutionAdvice:
+          'FSSAI national regulations strictly mandate State Licensing above Rs. 12 Lakhs per annum. Do not rely on the Rs. 20 Lakh figure on FoSCoS.',
+      },
+    ],
+    outdatedWarnings: [
+      {
+        id: 'time-1',
+        sourceId: 'src-3',
+        sourceTitle: 'Archived Restaurant & Cloud Kitchen Fee Schedule',
+        detectedDate: 'April 2021',
+        warningType: 'Outdated Circular',
+        riskDescription:
+          'Refers to a 2021 municipal fee schedule and obsolete fire exemptions that no longer reflect 2026 safety standards.',
+      },
+    ],
+    verificationChecklist: [
+      {
+        id: 'chk-1',
+        priority: 'High',
+        actionItem:
+          'Confirm current FoSCoS licensing category (Basic vs State License) based on projected turnover on foscos.fssai.gov.in',
+        targetAuthority: 'FSSAI FoSCoS Portal',
+        reason: 'Direct contradiction between Rs. 12L and Rs. 20L turnover threshold in reviewed sources.',
+      },
+      {
+        id: 'chk-2',
+        priority: 'High',
+        actionItem:
+          'Verify Pune Municipal Corporation (PMC) Health Trade License and Fire NOC mandate for residential buildings.',
+        targetAuthority: 'PMC Health Dept / Chief Fire Officer Pune',
+        reason: 'Fire safety criteria are missing from 2026 sources and exempt only in an outdated 2021 circular.',
+      },
+    ],
+  },
+  'overseas-edu-subsidy': {
+    readinessScore: 52,
+    readinessLabel: 'Moderate Risk — Parental Income Discrepancy & Missing Part-Time Course Policy',
+    executiveSummary:
+      'While the core CSIS interest subsidy terms (covering full interest during course duration plus 1 year moratorium) are confirmed, there is a substantial contradiction regarding the annual parental income ceiling (Rs. 4.5 Lakh vs Rs. 6.0 Lakh). Moreover, the reviewed sources completely omit whether online/hybrid Master’s degrees qualify, and bank renewal procedures remain undated.',
+    expectedRubric: [
+      'Parental Income Ceiling',
+      'Approved Foreign University & Degree Types',
+      'Eligible Study Modes (Full-Time vs Hybrid/Online)',
+      'Moratorium Period & Subsidy Disbursal',
+      'Mandatory Income Proof & Tehsildar Document',
+      'Annual Progress Report & Bank Renewal Procedure',
+    ],
+    sourcedFacts: [
+      {
+        id: 'fact-1',
+        category: 'Moratorium Terms',
+        statement:
+          'CSIS provides full interest subsidy during the moratorium period (course duration plus 1 year) for educational loans availed from scheduled banks.',
+        sourceIds: ['src-1'],
+        sourceTitles: ['Ministry of Education Scheme Portal (CSIS Overseas Guidelines)'],
+        confidence: 'High (Official Source)',
+      },
+      {
+        id: 'fact-2',
+        category: 'Eligible Degrees',
+        statement:
+          'Applicable only for Master’s and Ph.D. level postgraduate programs in approved foreign universities.',
+        sourceIds: ['src-1'],
+        sourceTitles: ['Ministry of Education Scheme Portal (CSIS Overseas Guidelines)'],
+        confidence: 'High (Official Source)',
+      },
+    ],
+    informationGaps: [
+      {
+        id: 'gap-1',
+        title: 'Part-Time, Hybrid, and Executive Degree Eligibility Missing',
+        missingQuestion:
+          'Are students pursuing STEM Master’s degrees through hybrid, online, or part-time foreign university enrollments eligible for the interest subsidy?',
+        impactLevel: 'Critical',
+        signalLabel: 'Potential Gap — Not Found in Reviewed Sources',
+        explanation:
+          'None of the 3 sources clarify whether non-traditional, hybrid, or online master’s programs qualify for central subsidy funds.',
+      },
+    ],
+    contradictions: [
+      {
+        id: 'conf-1',
+        parameter: 'Maximum Annual Gross Parental Income Ceiling',
+        severity: 'Critical Conflict',
+        signalLabel: 'Possible Conflict Between Sources',
+        sourceA: {
+          sourceId: 'src-1',
+          title: 'Ministry of Education Scheme Portal (CSIS Overseas Guidelines)',
+          claim: 'Annual gross parental income from all sources must not exceed Rs. 4,50,000 per annum.',
+        },
+        sourceB: {
+          sourceId: 'src-2',
+          title: 'Global Education Finance Advisory Blog',
+          claim: 'Students can claim government interest subsidy if family income is up to Rs. 6,00,000 per annum.',
+        },
+        resolutionAdvice:
+          'CSIS central guidelines strictly enforce the Rs. 4.50 Lakh EBC cap. The Rs. 6 Lakh figure likely refers to a state-level minority subsidy.',
+      },
+    ],
+    outdatedWarnings: [
+      {
+        id: 'time-1',
+        sourceId: 'src-3',
+        sourceTitle: 'Nationalized Bank Education Loan Customer Brochure',
+        detectedDate: 'Undated',
+        warningType: 'Missing Publication Date',
+        riskDescription:
+          'Brochure contains no publication date or circular number, leaving annual progress submission windows unverifiable.',
+      },
+    ],
+    verificationChecklist: [
+      {
+        id: 'chk-1',
+        priority: 'High',
+        actionItem:
+          'Confirm the Rs. 4.5 Lakh income ceiling with your scheduled commercial bank’s education loan nodal officer.',
+        targetAuthority: 'Canara Bank (Nodal Scheme Administrator) / CSIS Guidelines',
+        reason: 'Direct contradiction between Rs. 4.5L and Rs. 6.0L income ceilings across sources.',
+      },
+    ],
+  },
+};

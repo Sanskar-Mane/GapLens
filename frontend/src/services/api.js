@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { FALLBACK_SCENARIOS } from '../data/fallbackScenarios';
+import { FALLBACK_SCENARIOS, FALLBACK_ANALYSES } from '../data/fallbackScenarios';
 
 // Determine backend base URL: Uses Vite proxy /api or direct localhost:5000
 const API_BASE_URL =
@@ -10,7 +10,7 @@ export const DEFAULT_FREE_MODEL = 'meta-llama/llama-3.3-70b-instruct:free';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -21,11 +21,15 @@ apiClient.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     const clientKey = localStorage.getItem('gaplens_openrouter_key');
     const clientModel = localStorage.getItem('gaplens_openrouter_model') || DEFAULT_FREE_MODEL;
+    const forceDemo = localStorage.getItem('gaplens_force_offline_demo') === 'true';
 
     if (clientKey && clientKey.trim()) {
       config.headers['x-openrouter-key'] = clientKey.trim();
     }
     config.headers['x-openrouter-model'] = clientModel;
+    if (forceDemo) {
+      config.headers['x-force-offline-demo'] = 'true';
+    }
   }
   return config;
 });
@@ -35,7 +39,7 @@ apiClient.interceptors.request.use((config) => {
  */
 export const checkHealth = async () => {
   try {
-    const res = await apiClient.get('/health');
+    const res = await apiClient.get('/health', { timeout: 5000 });
     return {
       online: true,
       data: res.data,
@@ -60,7 +64,7 @@ export const checkHealth = async () => {
  */
 export const fetchScenarios = async () => {
   try {
-    const res = await apiClient.get('/scenarios');
+    const res = await apiClient.get('/scenarios', { timeout: 5000 });
     if (res.data && res.data.scenarios && res.data.scenarios.length > 0) {
       return res.data.scenarios;
     }
@@ -101,7 +105,6 @@ export const searchWebSources = async (query) => {
     return [];
   } catch (err) {
     console.warn('[GapLens API] Web search backend offline, providing local reference matches.');
-    // Client fallback topic match
     const lower = (query || '').toLowerCase();
     if (lower.includes('scholarship') || lower.includes('matric')) {
       return [
@@ -153,7 +156,6 @@ export const scanTextMetadata = async (content, publishedDate = '') => {
     const res = await apiClient.post('/scan-text', { content, publishedDate });
     return res.data;
   } catch (err) {
-    // Client fallback regex
     const combined = `${publishedDate || ''} ${content || ''}`;
     const cycleMatch = combined.match(/\b(20\d{2}[-–/]\d{2,4})\b/);
     const dateMatch = combined.match(
@@ -211,61 +213,58 @@ export const saveResearchSession = async (sessionData) => {
 };
 
 /**
- * Trigger Phase 1/2 analysis preparation & input validation
+ * Run Phase 3 Deep AI Gap-Detection Analysis
+ * Calls backend POST /api/analyze with Multi-Model Failover, or returns client fallback analysis
  */
-export const triggerAnalysisPrep = async (payload) => {
-  const clientKey = localStorage.getItem('gaplens_openrouter_key');
-  const clientModel = localStorage.getItem('gaplens_openrouter_model') || DEFAULT_FREE_MODEL;
+export const runAiAnalysis = async (payload) => {
+  const clientKey = typeof window !== 'undefined' ? localStorage.getItem('gaplens_openrouter_key') || '' : '';
+  const clientModel = typeof window !== 'undefined' ? localStorage.getItem('gaplens_openrouter_model') || DEFAULT_FREE_MODEL : DEFAULT_FREE_MODEL;
+  const forceOffline = typeof window !== 'undefined' ? localStorage.getItem('gaplens_force_offline_demo') === 'true' : false;
 
   const enrichedPayload = {
     ...payload,
-    openRouterKey: clientKey || payload.openRouterKey,
+    openRouterKey: forceOffline ? '' : (clientKey || payload.openRouterKey || ''),
     model: clientModel || payload.model || DEFAULT_FREE_MODEL,
+    forceDemoMode: forceOffline || payload.forceDemoMode,
   };
 
   try {
-    const res = await apiClient.post('/analyze', enrichedPayload);
-    return res.data;
+    const res = await apiClient.post('/analyze', enrichedPayload, { timeout: 35000 });
+    if (res.data && res.data.analysis) {
+      return res.data;
+    }
+    throw new Error(res.data?.message || 'Invalid analysis response format');
   } catch (err) {
-    if (err.response?.data) {
-      return err.response.data;
-    }
-    // Fallback client-side validation
-    const validSources = (payload.sources || []).filter(
-      (s) => s.content && s.content.trim().length >= 10
-    );
-    const undated = validSources.filter((s) => !s.publishedDate || !s.publishedDate.trim());
+    console.warn('[GapLens API] /api/analyze failed, using client fallback analysis:', err.message);
 
-    if (!payload.topic || !payload.topic.trim()) {
-      return { success: false, message: 'Please enter a research topic or decision goal.' };
-    }
-    if (validSources.length < 2) {
-      return { success: false, message: 'At least 2 sources with text are required.' };
+    // Topic matching for offline resilience
+    const lower = (payload.topic || '').toLowerCase();
+    let analysis = FALLBACK_ANALYSES['scholarship-2026'];
+    if (lower.includes('cloud kitchen') || lower.includes('fssai') || lower.includes('pune')) {
+      analysis = FALLBACK_ANALYSES['fssai-cloud-kitchen'] || analysis;
+    } else if (lower.includes('overseas') || lower.includes('subsidy') || lower.includes('csis')) {
+      analysis = FALLBACK_ANALYSES['overseas-edu-subsidy'] || analysis;
     }
 
     return {
       success: true,
-      readyForPhase3: true,
-      sourceCount: validSources.length,
-      activeModel: clientModel,
-      message: 'Workspace validated via Client Fallback Engine.',
-      validation: {
-        topic: payload.topic,
-        category: payload.category || 'Education',
-        totalSources: validSources.length,
-        undatedCount: undated.length,
-        hasUndatedWarning: undated.length > 0,
-        totalCharacters: validSources.reduce((acc, s) => acc + (s.content?.length || 0), 0),
-      },
-      aiConfig: {
-        hasKey: Boolean(clientKey),
-        keySource: clientKey ? 'client' : 'none',
-        activeModel: clientModel,
-        mode: clientKey ? 'Live OpenRouter AI' : 'Offline Seeded Demo Mode',
+      analysis,
+      meta: {
+        mode: 'Offline Demo Mode (Client Fallback Engine)',
+        modelUsed: 'gaplens-deterministic-fallback',
+        isOfflineDemo: true,
+        timestamp: new Date().toISOString(),
+        sourcesAnalyzed: (payload.sources || []).length,
+        fallbackNotice: 'Executed in Offline Demo Mode. Pre-verified gap detection analysis loaded.',
       },
     };
   }
 };
+
+/**
+ * Compatibility alias for Phase 1/2 trigger
+ */
+export const triggerAnalysisPrep = runAiAnalysis;
 
 /**
  * Direct OpenRouter probe (for testing key and model validity in ApiKeyModal)

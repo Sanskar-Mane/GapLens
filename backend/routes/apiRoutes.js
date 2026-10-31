@@ -7,6 +7,7 @@ const {
   detectTemporalMetadata,
   searchPermittedSources,
 } = require('../services/scraperService');
+const { analyzeSourcesWithAI } = require('../services/aiAnalysisService');
 
 const router = express.Router();
 
@@ -219,11 +220,13 @@ router.get('/sessions', async (req, res) => {
 
 /**
  * POST /api/analyze
- * Phase 1 & 2 validation stub accepting topic, category, sources, openRouterKey, model
+ * Phase 3 Deep AI Gap-Detection Engine with Multi-Model Fallback
+ * Analyzes provided sources for information gaps, cross-source contradictions,
+ * outdated warnings, and generates a prioritized verification checklist.
  */
 router.post('/analyze', async (req, res) => {
   try {
-    const { topic, category, sources, openRouterKey, model } = req.body;
+    const { topic, category, sources, openRouterKey, model, forceDemoMode } = req.body;
 
     if (!topic || typeof topic !== 'string' || !topic.trim()) {
       return res.status(400).json({
@@ -252,6 +255,7 @@ router.post('/analyze', async (req, res) => {
       });
     }
 
+    // Resolve client key and model
     const headerKey = req.headers['x-openrouter-key'];
     const activeKey =
       (typeof openRouterKey === 'string' && openRouterKey.trim() !== '' && openRouterKey) ||
@@ -266,50 +270,76 @@ router.post('/analyze', async (req, res) => {
       process.env.OPENROUTER_MODEL ||
       DEFAULT_MODEL;
 
-    // Run temporal detection on all valid sources
-    const evaluatedSources = validSources.map((s) => {
-      const meta = detectTemporalMetadata(s.content, s.publishedDate);
-      return {
-        ...s,
-        detectedDate: meta.detectedDateString,
-        temporalStatus: s.publishedDate ? meta.temporalStatus : 'undated',
-      };
+    const isForceDemo = Boolean(
+      forceDemoMode === true ||
+        req.headers['x-force-offline-demo'] === 'true' ||
+        process.env.FORCE_OFFLINE_DEMO === 'true'
+    );
+
+    // Run Phase 3 Deep AI Analysis
+    const aiResult = await analyzeSourcesWithAI({
+      topic: topic.trim(),
+      category: category || 'Education',
+      sources: validSources,
+      openRouterKey: activeKey,
+      preferredModel: activeModel,
+      forceDemoMode: isForceDemo,
     });
 
-    const undatedSources = evaluatedSources.filter(
-      (s) => !s.publishedDate || !s.publishedDate.trim() || s.temporalStatus === 'undated'
-    );
-    const outdatedSources = evaluatedSources.filter((s) => s.temporalStatus === 'outdated');
-    const totalChars = validSources.reduce((acc, s) => acc + s.content.length, 0);
+    // Save session automatically
+    let savedSessionId = null;
+    let savedStorage = 'in-memory';
+
+    try {
+      const sessionPayload = {
+        topic: topic.trim(),
+        category: category || 'Education',
+        sources: validSources,
+        model_used: aiResult.meta.modelUsed,
+        analysis_result: aiResult.analysis,
+        created_at: new Date().toISOString(),
+      };
+
+      if (supabase && isSupabaseConfigured) {
+        const { data } = await supabase
+          .from('research_sessions')
+          .insert([sessionPayload])
+          .select()
+          .single();
+
+        if (data) {
+          savedSessionId = data.id;
+          savedStorage = 'supabase';
+        }
+      }
+
+      if (!savedSessionId) {
+        const memSession = {
+          id: `mem-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+          ...sessionPayload,
+        };
+        inMemorySessions.unshift(memSession);
+        if (inMemorySessions.length > 50) inMemorySessions.pop();
+        savedSessionId = memSession.id;
+      }
+    } catch (saveErr) {
+      console.warn('[Session Auto-Save Error]', saveErr.message);
+    }
 
     return res.json({
       success: true,
-      readyForPhase3: true,
-      sourceCount: validSources.length,
-      activeModel,
-      message: 'Phase 2 Smart Ingestion & Metadata Analysis verified.',
-      validation: {
-        topic: topic.trim(),
-        category: category || 'Education',
-        totalSources: validSources.length,
-        undatedCount: undatedSources.length,
-        outdatedCount: outdatedSources.length,
-        hasUndatedWarning: undatedSources.length > 0,
-        hasOutdatedWarning: outdatedSources.length > 0,
-        totalCharacters: totalChars,
-      },
-      aiConfig: {
-        hasKey: Boolean(activeKey),
-        keySource: openRouterKey ? 'client' : headerKey ? 'header' : activeKey ? 'server' : 'none',
-        activeModel,
-        mode: activeKey ? 'Live OpenRouter AI' : 'Offline Seeded Demo Mode',
+      analysis: aiResult.analysis,
+      meta: {
+        ...aiResult.meta,
+        sessionId: savedSessionId,
+        storage: savedStorage,
       },
     });
   } catch (err) {
-    console.error('[Analyze Stub Error]', err);
+    console.error('[Analyze Phase 3 Error]', err);
     return res.status(500).json({
       success: false,
-      message: 'Analysis validation failed: ' + err.message,
+      message: 'Analysis failed: ' + err.message,
     });
   }
 });
