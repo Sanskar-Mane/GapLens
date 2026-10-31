@@ -1,8 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  CheckSquare,
-  Square,
-  Copy,
   Check,
   RotateCcw,
   ArrowLeft,
@@ -10,272 +7,619 @@ import {
   Building2,
   AlertCircle,
   FileDown,
-  Sparkles
+  Printer,
+  Mail,
+  Search,
+  ExternalLink,
+  MessageSquare,
+  TrendingUp,
+  AlertTriangle,
+  Save,
+  CheckCircle2,
+  Copy,
+  Edit2,
 } from 'lucide-react';
+import InquiryDraftModal from './InquiryDraftModal';
+import { patchSessionChecklist } from '../services/api';
+
+// Status Dot Pill for Priority
+function PriorityDotPill({ priority }) {
+  const p = (priority || '').toLowerCase();
+  let dotColor = 'bg-zinc-400';
+  if (p.includes('high') || p.includes('critical')) {
+    dotColor = 'bg-rose-500';
+  } else if (p.includes('medium')) {
+    dotColor = 'bg-amber-500';
+  } else if (p.includes('low')) {
+    dotColor = 'bg-emerald-500';
+  }
+
+  return (
+    <span className="inline-flex items-center space-x-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 px-2.5 py-0.5 text-[11px] font-medium text-zinc-800 dark:text-zinc-200 border border-zinc-200/60 dark:border-zinc-700/60 whitespace-nowrap">
+      <span className={`h-1.5 w-1.5 rounded-full ${dotColor}`} />
+      <span>{priority || 'Standard'}</span>
+    </span>
+  );
+}
 
 export default function VerificationChecklistView({
   checklist = [],
   analysis,
   topic = '',
   category = '',
+  sessionId = null,
   onBackToFindings,
   onResetResearch,
 }) {
-  const [completedIds, setCompletedIds] = useState(new Set());
-  const [priorityFilter, setPriorityFilter] = useState('All'); // 'All' | 'High' | 'Medium' | 'Low'
+  const storageKey = `gaplens_checklist_${(topic || 'default').slice(0, 30)}`;
+
+  const [completedIds, setCompletedIds] = useState(() => {
+    if (analysis?.checkedChecklistIds && Array.isArray(analysis.checkedChecklistIds)) {
+      return new Set(analysis.checkedChecklistIds);
+    }
+    try {
+      const saved = localStorage.getItem(`${storageKey}_completed`);
+      if (saved) return new Set(JSON.parse(saved));
+    } catch {}
+    return new Set();
+  });
+
+  const [verificationNotes, setVerificationNotes] = useState(() => {
+    if (analysis?.verificationNotes && typeof analysis.verificationNotes === 'object') {
+      return analysis.verificationNotes;
+    }
+    try {
+      const saved = localStorage.getItem(`${storageKey}_notes`);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {};
+  });
+
+  const [activeNoteEditId, setActiveNoteEditId] = useState(null);
+  const [tempNoteText, setTempNoteText] = useState('');
+
+  // Filtering: 'all' | 'remaining' | 'completed'
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
+
+  // Copy & Export state
   const [copied, setCopied] = useState(false);
 
+  // Inquiry Modal state
+  const [inquiryModalState, setInquiryModalState] = useState({
+    isOpen: false,
+    item: null,
+  });
+
+  // Persist completed items and notes to localStorage and backend
+  useEffect(() => {
+    try {
+      localStorage.setItem(`${storageKey}_completed`, JSON.stringify(Array.from(completedIds)));
+      localStorage.setItem(`${storageKey}_notes`, JSON.stringify(verificationNotes));
+    } catch {}
+
+    if (sessionId) {
+      patchSessionChecklist(sessionId, {
+        checkedIds: Array.from(completedIds),
+        verificationNotes,
+      });
+    }
+  }, [completedIds, verificationNotes, sessionId, storageKey]);
+
+  // Baseline Readiness Score
+  const baselineScore = analysis?.readinessScore || 54;
+
+  // Calculate Weighted Progress & Dynamic Adjusted Readiness Score
+  const getWeight = (priority) => {
+    const p = (priority || '').toLowerCase();
+    if (p.includes('high')) return 3;
+    if (p.includes('medium')) return 2;
+    return 1;
+  };
+
+  const totalWeight = checklist.reduce((sum, item) => sum + getWeight(item.priority), 0);
+  const completedWeight = checklist
+    .filter((item) => completedIds.has(item.id))
+    .reduce((sum, item) => sum + getWeight(item.priority), 0);
+
+  const totalCount = checklist.length;
+  const completedCount = completedIds.size;
+  const remainingCount = totalCount - completedCount;
+
+  let adjustedScore = baselineScore;
+  if (totalWeight > 0) {
+    if (completedCount === totalCount) {
+      adjustedScore = 100;
+    } else {
+      const weightRatio = completedWeight / totalWeight;
+      const potentialGain = 100 - baselineScore;
+      adjustedScore = Math.min(100, Math.round(baselineScore + weightRatio * potentialGain));
+    }
+  }
+
+  const scoreGain = adjustedScore - baselineScore;
+
+  // Toggle single item check
   const toggleCheck = (id) => {
     setCompletedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
 
-  const totalCount = checklist.length;
-  const completedCount = completedIds.size;
-  const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
-
-  // Filter items
-  const filteredList = checklist.filter((item) => {
-    if (priorityFilter === 'All') return true;
-    return item.priority?.toLowerCase() === priorityFilter.toLowerCase();
-  });
-
-  const getPriorityBadge = (priority) => {
-    const p = (priority || '').toLowerCase();
-    if (p.includes('high')) {
-      return 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950/70 dark:text-rose-300 dark:border-rose-800';
-    }
-    if (p.includes('medium')) {
-      return 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800';
-    }
-    return 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/70 dark:text-blue-300 dark:border-blue-800';
+  // Note handler
+  const handleStartEditNote = (e, item) => {
+    e.stopPropagation();
+    setActiveNoteEditId(item.id);
+    setTempNoteText(verificationNotes[item.id] || '');
   };
 
-  // Generate clean Markdown summary for clipboard export
-  const handleCopyReport = () => {
+  const handleSaveNote = (e, itemId) => {
+    e.stopPropagation();
+    setVerificationNotes((prev) => ({
+      ...prev,
+      [itemId]: tempNoteText.trim(),
+    }));
+    setActiveNoteEditId(null);
+    setTempNoteText('');
+  };
+
+  const handleCancelNote = (e) => {
+    e.stopPropagation();
+    setActiveNoteEditId(null);
+    setTempNoteText('');
+  };
+
+  // Filter checklist items
+  const filteredList = checklist.filter((item) => {
+    const isDone = completedIds.has(item.id);
+    if (statusFilter === 'remaining' && isDone) return false;
+    if (statusFilter === 'completed' && !isDone) return false;
+
+    if (priorityFilter !== 'all') {
+      const p = (item.priority || '').toLowerCase();
+      if (priorityFilter === 'high' && !p.includes('high')) return false;
+      if (priorityFilter === 'medium' && !p.includes('medium')) return false;
+      if (priorityFilter === 'low' && !p.includes('low')) return false;
+    }
+    return true;
+  });
+
+  // Generate clean Markdown Report
+  const buildMarkdownReport = () => {
     const lines = [
-      `# GapLens Verification Report`,
+      `# GapLens Official Verification Brief & Audit Report`,
       `**Research Goal:** ${topic}`,
-      `**Category:** ${category}`,
-      `**Decision Readiness Score:** ${analysis?.readinessScore || 'N/A'}/100 (${analysis?.readinessLabel || 'Audited'})`,
-      `**Date Generated:** ${new Date().toLocaleDateString()} (Baseline Year: 2026)`,
+      `**Category:** ${category || 'General'}`,
+      `**Initial Baseline Readiness Score:** ${baselineScore}/100`,
+      `**Current Verified Readiness Score:** ${adjustedScore}/100`,
+      `**Checklist Completion:** ${completedCount}/${totalCount} items verified`,
+      `**Audit Date:** ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} (2026 Baseline)`,
       ``,
-      `## Executive Summary`,
-      analysis?.executiveSummary || 'No summary available.',
+      `---`,
       ``,
-      `## Prioritized Action Checklist (${completedCount}/${totalCount} Completed)`,
+      `## 1. Executive Summary`,
+      analysis?.executiveSummary || 'No executive summary available.',
+      ``,
+      `## 2. Verification Checklist & Official Inquiries`,
       ...checklist.map((item, idx) => {
         const isDone = completedIds.has(item.id);
         const checkMark = isDone ? '[x]' : '[ ]';
-        return `${idx + 1}. ${checkMark} **[${item.priority} Priority]** ${item.actionItem}\n   - **Target Authority:** ${item.targetAuthority}\n   - **Reason:** ${item.reason}`;
+        const note = verificationNotes[item.id];
+        return `${idx + 1}. ${checkMark} **[${item.priority} Priority]** ${item.actionItem}\n   - **Target Authority:** ${item.targetAuthority}\n   - **Flagged Due To:** ${item.reason}${note ? `\n   - **Verification Note:** "${note}"` : ''}`;
       }),
       ``,
-      `---`,
-      `*Generated by GapLens — AI-Assisted Information Gap & Contradiction Detection Platform*`,
     ];
 
-    navigator.clipboard.writeText(lines.join('\n'));
+    if (analysis?.contradictions && analysis.contradictions.length > 0) {
+      lines.push(
+        `## 3. Disputed Claims & Contradictions`,
+        ...analysis.contradictions.map(
+          (c, idx) =>
+            `${idx + 1}. **${c.parameter}** (${c.severity})\n   - **Source A:** ${c.sourceA?.claim} (${c.sourceA?.title})\n   - **Source B:** ${c.sourceB?.claim} (${c.sourceB?.title})\n   - **Resolution:** ${c.resolutionAdvice}`
+        ),
+        ``
+      );
+    }
+
+    if (analysis?.informationGaps && analysis.informationGaps.length > 0) {
+      lines.push(
+        `## 4. Digital Dark Spots (Missing Policy Information)`,
+        ...analysis.informationGaps.map(
+          (g, idx) =>
+            `${idx + 1}. **${g.title}** (${g.impactLevel} Impact)\n   - **Unanswered Question:** ${g.missingQuestion}\n   - **Risk:** ${g.explanation}`
+        ),
+        ``
+      );
+    }
+
+    lines.push(
+      `---`,
+      `*Generated by GapLens — Information Gap & Contradiction Detection Engine*`
+    );
+
+    return lines.join('\n');
+  };
+
+  const handleCopyReport = () => {
+    navigator.clipboard.writeText(buildMarkdownReport());
     setCopied(true);
-    setTimeout(() => setCopied(false), 3000);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  const handleDownloadMarkdown = () => {
+    const reportText = buildMarkdownReport();
+    const blob = new Blob([reportText], { type: 'text/markdown;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `gaplens-verification-brief-${new Date().toISOString().slice(0, 10)}.md`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
 
   return (
     <div className="space-y-6">
-      
-      {/* 1. Header & Live Progress Bar */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors duration-200 dark:border-slate-800 dark:bg-slate-900/95 space-y-4">
-        
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300 dark:bg-emerald-950 dark:text-emerald-400 dark:ring-emerald-800">
-                <ShieldCheck className="h-3.5 w-3.5" />
-              </span>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                Step 4: Prioritized Official Verification Checklist
-              </h2>
+
+      {/* 1. DYNAMIC READINESS SCORE SIMULATOR ROW */}
+      <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-soft dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+          
+          {/* Dual Score & Metrics */}
+          <div className="flex items-center space-x-5">
+            <div className="flex items-center space-x-3">
+              <div className="flex h-16 w-16 flex-col items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-850">
+                <span className="text-lg font-bold text-zinc-500 dark:text-zinc-400">
+                  {baselineScore}
+                </span>
+                <span className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400">
+                  Baseline
+                </span>
+              </div>
+
+              <TrendingUp className="h-4 w-4 text-zinc-400 shrink-0" />
+
+              <div className="flex h-16 w-20 flex-col items-center justify-center rounded-xl border border-zinc-900 bg-zinc-900 text-white dark:border-white dark:bg-white dark:text-zinc-900 shadow-sm">
+                <span className="text-2xl font-black leading-none">
+                  {adjustedScore}
+                </span>
+                <span className="text-[9px] font-bold uppercase tracking-wider opacity-80 mt-0.5">
+                  / 100 Ready
+                </span>
+              </div>
             </div>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Clear actionable next steps guiding you directly to official authorities to resolve all detected dark spots.
+
+            <div className="space-y-1">
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-semibold text-zinc-900 dark:text-white">
+                  Live Readiness Recalculation
+                </span>
+                {scoreGain > 0 && (
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                    +{scoreGain} pts verified
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-zinc-400">
+                Checking action items updates readiness dynamically based on authority verification
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Stats Pill */}
+          <div className="flex items-center space-x-2 text-xs">
+            <span className="text-zinc-400">Completed:</span>
+            <span className="font-mono font-bold text-zinc-900 dark:text-white">
+              {completedCount} / {totalCount} items
+            </span>
+            <span className="text-zinc-300 dark:text-zinc-700">&bull;</span>
+            <span className="font-mono text-zinc-500">
+              {Math.round((completedCount / (totalCount || 1)) * 100)}%
+            </span>
+          </div>
+
+        </div>
+
+        {/* Horizontal Progress Bar */}
+        <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800 space-y-1.5">
+          <div className="relative h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+            <div
+              className="h-full rounded-full bg-zinc-900 dark:bg-zinc-100 transition-all duration-300 ease-out"
+              style={{ width: `${adjustedScore}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 2. TABULAR CHECKLIST CARD ("Task Overview" style from reference UI) */}
+      <div className="rounded-2xl border border-zinc-200/80 bg-white shadow-soft dark:border-zinc-800 dark:bg-zinc-900 overflow-hidden">
+        
+        {/* Card Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 border-b border-zinc-100 dark:border-zinc-800">
+          <div>
+            <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
+              Verification Checklist Overview
+            </h3>
+            <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
+              Direct action items and target regulatory departments
             </p>
           </div>
 
-          {/* Action buttons: Copy report & start new */}
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Action and Filter Pills */}
+          <div className="flex flex-wrap items-center gap-2 no-print">
+            {/* Status Filter Dropdown / Pills */}
+            <div className="flex items-center space-x-1 rounded-lg bg-zinc-100 dark:bg-zinc-800/80 p-0.5">
+              {[
+                { id: 'all', label: 'All' },
+                { id: 'remaining', label: 'Remaining' },
+                { id: 'completed', label: 'Completed' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setStatusFilter(tab.id)}
+                  className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
+                    statusFilter === tab.id
+                      ? 'bg-white text-zinc-900 dark:bg-zinc-900 dark:text-white shadow-xs'
+                      : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Copy Brief Button */}
             <button
               type="button"
               onClick={handleCopyReport}
-              className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-750 transition-colors shadow-xs"
+              className="inline-flex items-center space-x-1.5 rounded-lg border border-zinc-200/80 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors"
+              title="Copy brief"
             >
               {copied ? (
                 <>
-                  <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">Report Copied!</span>
+                  <Check className="h-3.5 w-3.5 text-emerald-600" />
+                  <span className="text-emerald-600 font-bold">Copied</span>
                 </>
               ) : (
                 <>
-                  <Copy className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-                  <span>Copy Verification Report</span>
+                  <Copy className="h-3.5 w-3.5" />
+                  <span>Copy</span>
                 </>
               )}
             </button>
 
+            {/* Export Markdown */}
             <button
               type="button"
-              onClick={onResetResearch}
-              className="inline-flex items-center space-x-1.5 rounded-xl border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300 transition-colors"
+              onClick={handleDownloadMarkdown}
+              className="inline-flex items-center space-x-1.5 rounded-lg border border-zinc-200/80 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors"
+              title="Export report as Markdown"
             >
-              <RotateCcw className="h-3.5 w-3.5" />
-              <span>Start New Research</span>
+              <FileDown className="h-3.5 w-3.5" />
+              <span>Export (.md)</span>
+            </button>
+
+            {/* Print / PDF */}
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="inline-flex items-center space-x-1.5 rounded-lg border border-zinc-200/80 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors"
+              title="Print brief"
+            >
+              <Printer className="h-3.5 w-3.5" />
+              <span>Print</span>
             </button>
           </div>
         </div>
 
-        {/* Live Progress Bar */}
-        <div className="space-y-1.5 pt-2">
-          <div className="flex justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
-            <span>
-              {completedCount} of {totalCount} Verification Steps Completed
-            </span>
-            <span className="font-mono text-indigo-600 dark:text-indigo-400">
-              {progressPercent}%
-            </span>
-          </div>
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-            <div
-              className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all duration-300 ease-out"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
+        {/* Table Body */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-zinc-100 bg-zinc-50/70 text-[11px] font-semibold text-zinc-400 dark:border-zinc-800 dark:bg-zinc-850/50 dark:text-zinc-500">
+                <th className="py-3 px-4 w-12 text-center">Status</th>
+                <th className="py-3 px-4 min-w-[280px]">Verification Action Item</th>
+                <th className="py-3 px-4 min-w-[180px]">Target Authority</th>
+                <th className="py-3 px-4 min-w-[200px]">Flagged Reason</th>
+                <th className="py-3 px-4 w-28">Priority</th>
+                <th className="py-3 px-4 w-28 text-right no-print">Inquiry</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+              {filteredList.map((item, idx) => {
+                const isDone = completedIds.has(item.id);
+                const hasNote = Boolean(verificationNotes[item.id]);
+                const isEditingNote = activeNoteEditId === item.id;
+                const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(
+                  `${topic} ${item.targetAuthority} ${item.actionItem}`
+                )}`;
+
+                return (
+                  <React.Fragment key={item.id || idx}>
+                    <tr
+                      onClick={() => toggleCheck(item.id)}
+                      className={`cursor-pointer transition-colors ${
+                        isDone
+                          ? 'bg-zinc-50/50 dark:bg-zinc-850/20 text-zinc-400 dark:text-zinc-500'
+                          : 'hover:bg-zinc-50/80 dark:hover:bg-zinc-850/40 text-zinc-800 dark:text-zinc-200'
+                      }`}
+                    >
+                      {/* Checkbox column */}
+                      <td className="py-3.5 px-4 text-center">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleCheck(item.id);
+                          }}
+                          className={`flex h-5 w-5 mx-auto items-center justify-center rounded-md border transition-all ${
+                            isDone
+                              ? 'bg-zinc-900 border-zinc-900 text-white dark:bg-white dark:border-white dark:text-zinc-900'
+                              : 'border-zinc-300 dark:border-zinc-700 hover:border-zinc-900'
+                          }`}
+                        >
+                          {isDone && <Check className="h-3 w-3 stroke-[3]" />}
+                        </button>
+                      </td>
+
+                      {/* Action Item */}
+                      <td className="py-3.5 px-4">
+                        <div className="space-y-1">
+                          <p className={`font-semibold ${isDone ? 'line-through text-zinc-400 dark:text-zinc-500' : 'text-zinc-900 dark:text-white'}`}>
+                            {item.actionItem}
+                          </p>
+                          {hasNote && !isEditingNote && (
+                            <p className="text-[11px] text-zinc-500 italic flex items-center space-x-1">
+                              <MessageSquare className="h-3 w-3 shrink-0" />
+                              <span>"{verificationNotes[item.id]}"</span>
+                            </p>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Target Authority */}
+                      <td className="py-3.5 px-4 text-zinc-500 dark:text-zinc-400 font-medium">
+                        {item.targetAuthority}
+                      </td>
+
+                      {/* Flagged Reason */}
+                      <td className="py-3.5 px-4 text-zinc-500 dark:text-zinc-400 text-[11px]">
+                        {item.reason}
+                      </td>
+
+                      {/* Priority */}
+                      <td className="py-3.5 px-4">
+                        <PriorityDotPill priority={item.priority} />
+                      </td>
+
+                      {/* Inquiry & Actions */}
+                      <td className="py-3.5 px-4 text-right no-print" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end space-x-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => handleStartEditNote(e, item)}
+                            className="p-1 rounded-md text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                            title="Add or edit verification note"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </button>
+
+                          <a
+                            href={searchUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-1 rounded-md text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                            title="Search official portals"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setInquiryModalState({
+                                isOpen: true,
+                                item,
+                              })
+                            }
+                            className="p-1 rounded-md text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                            title="Draft Official Authority Inquiry"
+                          >
+                            <Mail className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* Note Editor Row */}
+                    {isEditingNote && (
+                      <tr className="bg-zinc-50 dark:bg-zinc-850" onClick={(e) => e.stopPropagation()}>
+                        <td colSpan={6} className="p-3 px-4">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="text"
+                              value={tempNoteText}
+                              onChange={(e) => setTempNoteText(e.target.value)}
+                              placeholder="Record official verification notes (e.g. Inquired with desk, confirmed Nov 30 deadline)..."
+                              className="flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-zinc-900"
+                              autoFocus
+                            />
+                            <button
+                              type="button"
+                              onClick={handleCancelNote}
+                              className="rounded-lg px-2.5 py-1.5 text-xs text-zinc-500 hover:text-zinc-900"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleSaveNote(e, item.id)}
+                              className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+
+              {filteredList.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-xs text-zinc-400">
+                    No verification items match the selected filter.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
 
       </div>
 
-      {/* 2. Priority Filter Pills */}
-      <div className="flex items-center space-x-2">
-        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Filter:</span>
-        {['All', 'High', 'Medium', 'Low'].map((p) => (
-          <button
-            key={p}
-            type="button"
-            onClick={() => setPriorityFilter(p)}
-            className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors ${
-              priorityFilter === p
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800'
-            }`}
-          >
-            {p === 'All' ? 'All Steps' : `${p} Priority`}
-          </button>
-        ))}
-      </div>
-
-      {/* 3. Interactive Checklist Cards */}
-      <div className="space-y-3">
-        {filteredList.map((item, idx) => {
-          const isDone = completedIds.has(item.id);
-
-          return (
-            <div
-              key={item.id || idx}
-              onClick={() => toggleCheck(item.id)}
-              className={`group relative flex cursor-pointer items-start space-x-3.5 rounded-2xl border p-4 sm:p-5 transition-all shadow-sm ${
-                isDone
-                  ? 'border-emerald-200 bg-emerald-50/40 dark:border-emerald-950 dark:bg-emerald-950/20 opacity-80'
-                  : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/95 dark:hover:border-slate-700'
-              }`}
-            >
-              {/* Checkbox Icon */}
-              <div className="pt-0.5 shrink-0">
-                {isDone ? (
-                  <CheckSquare className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                ) : (
-                  <Square className="h-5 w-5 text-slate-400 group-hover:text-indigo-600 dark:text-slate-600 dark:group-hover:text-indigo-400 transition-colors" />
-                )}
-              </div>
-
-              {/* Item Details */}
-              <div className="flex-1 space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h4
-                    className={`text-sm font-bold text-slate-900 dark:text-white transition-all ${
-                      isDone ? 'line-through text-slate-500 dark:text-slate-500' : ''
-                    }`}
-                  >
-                    {item.actionItem}
-                  </h4>
-                  <span
-                    className={`rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${getPriorityBadge(
-                      item.priority
-                    )}`}
-                  >
-                    {item.priority} Priority
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                  {/* Target Authority */}
-                  <div className="flex items-center space-x-1.5 rounded-lg border border-slate-200/80 bg-slate-50/70 px-2.5 py-1.5 dark:border-slate-800 dark:bg-slate-950/50">
-                    <Building2 className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
-                    <span className="text-slate-500 dark:text-slate-400">Target Authority:</span>
-                    <strong className="text-slate-800 dark:text-slate-200 font-semibold truncate">
-                      {item.targetAuthority}
-                    </strong>
-                  </div>
-
-                  {/* Reason Flagged */}
-                  <div className="flex items-center space-x-1.5 rounded-lg border border-slate-200/80 bg-slate-50/70 px-2.5 py-1.5 dark:border-slate-800 dark:bg-slate-950/50">
-                    <AlertCircle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                    <span className="text-slate-500 dark:text-slate-400">Flagged Due To:</span>
-                    <span className="text-slate-700 dark:text-slate-300 truncate">
-                      {item.reason}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-
-        {filteredList.length === 0 && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center dark:border-slate-800 dark:bg-slate-900">
-            <CheckSquare className="mx-auto h-7 w-7 text-slate-400" />
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-              No verification steps match the selected priority filter.
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* 4. Bottom Navigation Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+      {/* 3. BOTTOM NAVIGATION BAR */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-zinc-200/80 dark:border-zinc-800 no-print">
         <button
           type="button"
           onClick={onBackToFindings}
-          className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors w-full sm:w-auto justify-center"
+          className="inline-flex items-center space-x-1.5 rounded-xl border border-zinc-200/80 bg-white px-4 py-2.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors w-full sm:w-auto justify-center"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
-          <span>← Back to AI Findings</span>
+          <span>← Back to Dashboard Findings</span>
         </button>
 
         <button
           type="button"
           onClick={onResetResearch}
-          className="inline-flex items-center space-x-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-semibold text-white shadow-md shadow-indigo-600/25 hover:bg-indigo-500 transition-all w-full sm:w-auto justify-center"
+          className="inline-flex items-center space-x-2 rounded-xl bg-zinc-900 px-5 py-2.5 text-xs font-semibold text-white shadow-soft hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 transition-all w-full sm:w-auto justify-center"
         >
           <RotateCcw className="h-3.5 w-3.5" />
           <span>Start New Research Question</span>
         </button>
       </div>
 
+      {/* Official Inquiry Modal */}
+      <InquiryDraftModal
+        isOpen={inquiryModalState.isOpen}
+        onClose={() => setInquiryModalState({ isOpen: false, item: null })}
+        topic={topic}
+        item={inquiryModalState.item}
+        allChecklist={checklist}
+        informationGaps={analysis?.informationGaps || []}
+        contradictions={analysis?.contradictions || []}
+      />
+
     </div>
   );
 }
-

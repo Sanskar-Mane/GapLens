@@ -1,3 +1,22 @@
+const dns = require('dns');
+const net = require('net');
+const https = require('https');
+
+// Force IPv4 DNS resolution first to avoid Windows Cloudflare/IPv6 timeouts
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
+if (net.setDefaultAutoSelectFamily) {
+  net.setDefaultAutoSelectFamily(false);
+}
+
+// Global HTTPS agent enforcing IPv4 with keep-alive
+const globalIpv4Agent = new https.Agent({
+  family: 4,
+  keepAlive: true,
+  timeout: 30000,
+});
+
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
@@ -7,7 +26,7 @@ const dotenv = require('dotenv');
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 const { isSupabaseConfigured } = require('./config/supabaseClient');
-const { DEFAULT_MODEL } = require('./config/openRouterConfig');
+const { getDefaultModel } = require('./config/openRouterConfig');
 const apiRoutes = require('./routes/apiRoutes');
 
 const app = express();
@@ -18,7 +37,14 @@ app.use(
   cors({
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-openrouter-key', 'x-openrouter-model'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-gemini-key',
+      'x-gemini-model',
+      'x-openrouter-key',
+      'x-openrouter-model',
+    ],
   })
 );
 
@@ -68,9 +94,12 @@ app.use((err, req, res, next) => {
 // Start Server
 app.listen(PORT, () => {
   const hasKey = Boolean(
-    process.env.OPENROUTER_API_KEY &&
+    (process.env.GEMINI_API_KEY &&
+      process.env.GEMINI_API_KEY.trim() !== '' &&
+      process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here') ||
+    (process.env.OPENROUTER_API_KEY &&
       process.env.OPENROUTER_API_KEY.trim() !== '' &&
-      process.env.OPENROUTER_API_KEY !== 'your_openrouter_key_here'
+      process.env.OPENROUTER_API_KEY !== 'your_openrouter_key_here')
   );
 
   console.log('====================================================');
@@ -80,6 +109,6 @@ app.listen(PORT, () => {
   console.log(`   📦 Scenarios:  http://localhost:${PORT}/api/scenarios`);
   console.log(`   🗄️  Database:   ${isSupabaseConfigured ? 'Supabase Connected' : 'In-Memory Fallback Store'}`);
   console.log(`   🤖 OpenRouter: ${hasKey ? 'Configured in .env' : 'Ready (Client Header / Demo Mode)'}`);
-  console.log(`   🧠 AI Model:   ${process.env.OPENROUTER_MODEL || DEFAULT_MODEL}`);
+  console.log(`   🧠 AI Models:  ${process.env.OPENROUTER_MODEL || getDefaultModel()}`);
   console.log('====================================================');
 });

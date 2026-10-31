@@ -1,7 +1,12 @@
 const express = require('express');
 const sampleScenarios = require('../data/sampleScenarios');
 const { supabase, isSupabaseConfigured, inMemorySessions } = require('../config/supabaseClient');
-const { FREE_MODELS, DEFAULT_MODEL } = require('../config/openRouterConfig');
+const {
+  getAvailableModels,
+  getDefaultModel,
+  FREE_MODELS,
+  DEFAULT_MODEL,
+} = require('../config/openRouterConfig');
 const {
   extractUrlContent,
   detectTemporalMetadata,
@@ -13,25 +18,41 @@ const router = express.Router();
 
 /**
  * GET /api/health
- * Returns service status, Supabase connectivity, OpenRouter configuration, and available free models
+ * Returns service status, Supabase connectivity, Google Gemini configuration, and models from .env
  */
 router.get('/health', (req, res) => {
+  const envKey = process.env.GEMINI_API_KEY || process.env.OPENROUTER_API_KEY;
   const hasServerKey = Boolean(
-    process.env.OPENROUTER_API_KEY &&
-      process.env.OPENROUTER_API_KEY.trim() !== '' &&
-      process.env.OPENROUTER_API_KEY !== 'your_openrouter_key_here'
+    envKey &&
+      envKey.trim() !== '' &&
+      envKey !== 'your_gemini_api_key_here' &&
+      envKey !== 'your_openrouter_key_here'
   );
-  const defaultModel = process.env.OPENROUTER_MODEL || DEFAULT_MODEL;
+  const defaultModel = getDefaultModel();
+  const availableModels = getAvailableModels();
 
   res.json({
     status: 'ok',
     supabaseConnected: isSupabaseConfigured,
     storageMode: isSupabaseConfigured ? 'Supabase Database' : 'In-Memory Fallback',
     hasServerOpenRouterKey: hasServerKey,
+    hasServerGeminiKey: hasServerKey,
     defaultModel,
-    availableModels: FREE_MODELS,
+    availableModels,
     timestamp: new Date().toISOString(),
     inMemorySessionsCount: inMemorySessions.length,
+  });
+});
+
+/**
+ * GET /api/models
+ * Returns the models strictly configured in .env (GEMINI_MODEL / OPENROUTER_MODEL)
+ */
+router.get('/models', (req, res) => {
+  res.json({
+    success: true,
+    defaultModel: getDefaultModel(),
+    models: getAvailableModels(),
   });
 });
 
@@ -123,7 +144,7 @@ router.post('/sessions', async (req, res) => {
       topic: topic.trim(),
       category: category || 'Education',
       sources: cleanedSources,
-      model_used: model_used || modelUsed || process.env.OPENROUTER_MODEL || DEFAULT_MODEL,
+      model_used: model_used || modelUsed || getDefaultModel(),
       analysis_result: analysis_result || analysisResult || null,
       created_at: new Date().toISOString(),
     };
@@ -177,7 +198,7 @@ router.post('/sessions', async (req, res) => {
 
 /**
  * GET /api/sessions
- * Fetches the 10 most recent saved research sessions
+ * Fetches the 15 most recent saved research sessions
  */
 router.get('/sessions', async (req, res) => {
   try {
@@ -185,9 +206,9 @@ router.get('/sessions', async (req, res) => {
       try {
         const { data, error } = await supabase
           .from('research_sessions')
-          .select('*')
+          .select('id, topic, category, sources, model_used, analysis_result, created_at')
           .order('created_at', { ascending: false })
-          .limit(10);
+          .limit(15);
 
         if (!error && Array.isArray(data)) {
           return res.json({
@@ -203,7 +224,7 @@ router.get('/sessions', async (req, res) => {
     }
 
     // Return in-memory fallback sessions
-    const recentMemory = inMemorySessions.slice(0, 10);
+    const recentMemory = inMemorySessions.slice(0, 15);
     return res.json({
       success: true,
       storage: 'in-memory',
@@ -219,6 +240,118 @@ router.get('/sessions', async (req, res) => {
 });
 
 /**
+ * PATCH /api/sessions/:id/checklist
+ * Persists interactive checklist state and official verification notes
+ */
+router.patch('/sessions/:id/checklist', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { checkedIds = [], verificationNotes = {} } = req.body;
+
+    if (!id) {
+      return res.status(400).json({ success: false, message: 'Session ID is required.' });
+    }
+
+    let updated = false;
+
+    // 1. Try Supabase update if configured
+    if (supabase && isSupabaseConfigured) {
+      try {
+        const { data: existing } = await supabase
+          .from('research_sessions')
+          .select('analysis_result')
+          .eq('id', id)
+          .single();
+
+        if (existing && existing.analysis_result) {
+          const mergedAnalysis = {
+            ...existing.analysis_result,
+            checkedChecklistIds: checkedIds,
+            verificationNotes: verificationNotes,
+          };
+
+          const { error: updateErr } = await supabase
+            .from('research_sessions')
+            .update({ analysis_result: mergedAnalysis })
+            .eq('id', id);
+
+          if (!updateErr) {
+            updated = true;
+          }
+        }
+      } catch (sbErr) {
+        console.warn('[Supabase Patch Error]', sbErr.message);
+      }
+    }
+
+    // 2. Also update in-memory session if found
+    const memIndex = inMemorySessions.findIndex((s) => s.id === id);
+    if (memIndex !== -1) {
+      const existingAnalysis = inMemorySessions[memIndex].analysis_result || {};
+      inMemorySessions[memIndex].analysis_result = {
+        ...existingAnalysis,
+        checkedChecklistIds: checkedIds,
+        verificationNotes: verificationNotes,
+      };
+      updated = true;
+    }
+
+    return res.json({
+      success: true,
+      message: 'Checklist progress persisted successfully.',
+      sessionId: id,
+      updated,
+    });
+  } catch (err) {
+    console.error('[Patch Checklist Error]', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update session checklist: ' + err.message,
+    });
+  }
+});
+
+/**
+ * DELETE /api/sessions/:id
+ * Removes a saved research session from Supabase or in-memory fallback
+ */
+router.delete('/sessions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ success: false, message: 'Session ID is required.' });
+    }
+
+    // 1. Delete from Supabase if configured
+    if (supabase && isSupabaseConfigured) {
+      try {
+        await supabase.from('research_sessions').delete().eq('id', id);
+      } catch (sbErr) {
+        console.warn('[Supabase Delete Error]', sbErr.message);
+      }
+    }
+
+    // 2. Delete from in-memory fallback array
+    const initialLen = inMemorySessions.length;
+    const filtered = inMemorySessions.filter((s) => s.id !== id);
+    inMemorySessions.length = 0;
+    filtered.forEach((s) => inMemorySessions.push(s));
+
+    return res.json({
+      success: true,
+      message: 'Session deleted successfully.',
+      sessionId: id,
+    });
+  } catch (err) {
+    console.error('[Delete Session Error]', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete session: ' + err.message,
+    });
+  }
+});
+
+/**
  * POST /api/analyze
  * Phase 3 Deep AI Gap-Detection Engine with Multi-Model Fallback
  * Analyzes provided sources for information gaps, cross-source contradictions,
@@ -226,7 +359,7 @@ router.get('/sessions', async (req, res) => {
  */
 router.post('/analyze', async (req, res) => {
   try {
-    const { topic, category, sources, openRouterKey, model, forceDemoMode } = req.body;
+    const { topic, category, sources, openRouterKey, geminiKey, model, forceDemoMode } = req.body;
 
     if (!topic || typeof topic !== 'string' || !topic.trim()) {
       return res.status(400).json({
@@ -256,19 +389,25 @@ router.post('/analyze', async (req, res) => {
     }
 
     // Resolve client key and model
-    const headerKey = req.headers['x-openrouter-key'];
+    const headerKey = req.headers['x-gemini-key'] || req.headers['x-openrouter-key'];
+    const envKey = process.env.GEMINI_API_KEY || process.env.OPENROUTER_API_KEY;
+    const isEnvKeyValid =
+      envKey &&
+      envKey.trim() !== '' &&
+      envKey !== 'your_gemini_api_key_here' &&
+      envKey !== 'your_openrouter_key_here';
+
     const activeKey =
-      (typeof openRouterKey === 'string' && openRouterKey.trim() !== '' && openRouterKey) ||
-      (typeof headerKey === 'string' && headerKey.trim() !== '' && headerKey) ||
-      (process.env.OPENROUTER_API_KEY &&
-        process.env.OPENROUTER_API_KEY !== 'your_openrouter_key_here' &&
-        process.env.OPENROUTER_API_KEY);
+      (typeof geminiKey === 'string' && geminiKey.trim() !== '' && geminiKey.trim()) ||
+      (typeof openRouterKey === 'string' && openRouterKey.trim() !== '' && openRouterKey.trim()) ||
+      (typeof headerKey === 'string' && headerKey.trim() !== '' && headerKey.trim()) ||
+      (isEnvKeyValid ? envKey.trim() : '');
 
     const activeModel =
       model ||
+      req.headers['x-gemini-model'] ||
       req.headers['x-openrouter-model'] ||
-      process.env.OPENROUTER_MODEL ||
-      DEFAULT_MODEL;
+      getDefaultModel();
 
     const isForceDemo = Boolean(
       forceDemoMode === true ||
@@ -282,6 +421,7 @@ router.post('/analyze', async (req, res) => {
       category: category || 'Education',
       sources: validSources,
       openRouterKey: activeKey,
+      geminiKey: activeKey,
       preferredModel: activeModel,
       forceDemoMode: isForceDemo,
     });

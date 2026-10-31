@@ -3,7 +3,7 @@ import {
   Layers,
   Plus,
   FileCheck,
-  CalendarClock
+  CalendarClock,
 } from 'lucide-react';
 import SourceCard from './SourceCard';
 
@@ -29,42 +29,33 @@ export default function SourceCollector({
     <div className="space-y-4">
       
       {/* Section Header */}
-      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition-colors duration-200 dark:border-slate-800 dark:bg-slate-900/90 sm:flex-row sm:items-center sm:justify-between sm:p-5 shadow-sm">
+      <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-soft dark:border-zinc-800 dark:bg-zinc-900 transition-colors sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 ring-1 ring-indigo-300 dark:bg-indigo-600/30 dark:text-indigo-400 dark:ring-indigo-500/50">
+            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900">
               <Layers className="h-3.5 w-3.5" />
             </span>
-            <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-              Collected Sources ({count}/{maxSources}) — Minimum 2 required for cross-verification
+            <h2 className="text-base font-bold text-zinc-900 dark:text-white tracking-tight">
+              Collected Sources ({count}/{maxSources}) — Min 2 required for cross-verification
             </h2>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Compare official notices, application portals, third-party blogs, and circulars to reveal information dark spots.
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            Compare official notices, application portals, circulars, and secondary guidance to reveal dark spots.
           </p>
         </div>
 
         {/* Source Status Pills & Add Button */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Active sources with content */}
-          <div className="flex items-center space-x-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs dark:border-slate-800 dark:bg-slate-950">
-            <FileCheck
-              className={`h-3.5 w-3.5 ${
-                validSourcesCount >= 2 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
-              }`}
-            />
-            <span className="text-slate-700 dark:text-slate-300">
-              <strong className={validSourcesCount >= 2 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}>
-                {validSourcesCount}
-              </strong>
-              /{count} with text
-            </span>
+          {/* Active sources with text */}
+          <div className="flex items-center space-x-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 px-3 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 border border-zinc-200/50 dark:border-zinc-700/50">
+            <span className={`h-1.5 w-1.5 rounded-full ${validSourcesCount >= 2 ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+            <span>{validSourcesCount}/{count} with text</span>
           </div>
 
           {/* Undated warnings */}
           {undatedCount > 0 && (
-            <div className="flex items-center space-x-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
-              <CalendarClock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+            <div className="flex items-center space-x-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 px-3 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 border border-zinc-200/50 dark:border-zinc-700/50">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
               <span>{undatedCount} undated</span>
             </div>
           )}
@@ -74,7 +65,7 @@ export default function SourceCollector({
             <button
               type="button"
               onClick={onAddSource}
-              className="inline-flex items-center space-x-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-600 hover:text-white transition-all shadow-sm dark:border-indigo-600/60 dark:bg-indigo-600/20 dark:text-indigo-300 dark:hover:bg-indigo-600 dark:hover:text-white"
+              className="inline-flex items-center space-x-1.5 rounded-xl bg-zinc-900 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 transition-all shadow-soft"
             >
               <Plus className="h-3.5 w-3.5" />
               <span>+ Add Source</span>
@@ -102,15 +93,15 @@ export default function SourceCollector({
         <button
           type="button"
           onClick={onAddSource}
-          className="group flex w-full items-center justify-center space-x-2 rounded-2xl border-2 border-dashed border-slate-300 bg-white/60 p-4 text-xs font-semibold text-slate-600 hover:border-indigo-500 hover:bg-indigo-50/50 hover:text-indigo-700 transition-all dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-400 dark:hover:border-indigo-600/60 dark:hover:bg-indigo-950/20 dark:hover:text-indigo-300"
+          className="group flex w-full items-center justify-center space-x-2 rounded-2xl border-2 border-dashed border-zinc-300 dark:border-zinc-800 bg-white/50 p-4 text-xs font-semibold text-zinc-600 hover:border-zinc-900 hover:bg-white hover:text-zinc-900 transition-all dark:bg-zinc-900/40 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:bg-zinc-850 dark:hover:text-white"
         >
-          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-200 text-slate-700 group-hover:bg-indigo-600 group-hover:text-white transition-colors dark:bg-slate-800 dark:text-slate-300">
+          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-zinc-200 text-zinc-700 group-hover:bg-zinc-900 group-hover:text-white transition-colors dark:bg-zinc-800 dark:text-zinc-300 dark:group-hover:bg-white dark:group-hover:text-zinc-900">
             <Plus className="h-4 w-4" />
           </div>
           <span>+ Add Another Source ({count} of {maxSources} loaded)</span>
         </button>
       ) : (
-        <div className="rounded-xl border border-slate-200 bg-slate-100 p-3 text-center text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-400">
+        <div className="rounded-xl border border-zinc-200 bg-zinc-100 p-3 text-center text-xs text-zinc-500 dark:border-zinc-800 dark:bg-zinc-850 dark:text-zinc-400">
           Maximum of {maxSources} sources reached for this cross-verification session.
         </div>
       )}

@@ -4,36 +4,30 @@ import {
   Search,
   Calendar,
   GitCompare,
-  FileCheck,
   ListChecks,
-  Loader2
+  Loader2,
 } from 'lucide-react';
 
 const ANALYSIS_STEPS = [
   {
     icon: Search,
     label: 'Ingesting and normalizing text across sources...',
-    duration: 1200,
   },
   {
     icon: Calendar,
     label: 'Evaluating 2026 temporal currency and cycle dates...',
-    duration: 1400,
   },
   {
     icon: GitCompare,
     label: 'Cross-examining statements for direct contradictions...',
-    duration: 1600,
   },
   {
     icon: Sparkles,
     label: 'Auditing expected decision rubric for dark spots...',
-    duration: 1500,
   },
   {
     icon: ListChecks,
     label: 'Synthesizing prioritized official verification checklist...',
-    duration: 1300,
   },
 ];
 
@@ -56,80 +50,69 @@ export default function AnalysisLoadingOverlay({ activeModel, isVisible = true }
   if (!isVisible) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-md rounded-3xl border border-indigo-200 bg-white p-6 shadow-2xl transition-colors duration-200 dark:border-indigo-900/60 dark:bg-slate-900 text-center space-y-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="relative w-full max-w-md rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-2xl transition-colors dark:border-zinc-800 dark:bg-zinc-900 text-center space-y-5">
         
-        {/* Glow decoration */}
-        <div className="pointer-events-none absolute -top-16 -right-16 h-36 w-36 rounded-full bg-indigo-500/20 blur-2xl" />
-
-        {/* Pulsing icon */}
-        <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/30">
-          <Sparkles className="h-8 w-8 animate-spin" style={{ animationDuration: '6s' }} />
-          <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-[10px] text-white">
-            <Loader2 className="h-3 w-3 animate-spin" />
+        {/* Minimal Icon */}
+        <div className="relative mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-soft">
+          <Sparkles className="h-6 w-6 animate-spin" style={{ animationDuration: '6s' }} />
+          <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-zinc-700 text-[9px] text-white">
+            <Loader2 className="h-2.5 w-2.5 animate-spin" />
           </span>
         </div>
 
         {/* Headings */}
         <div className="space-y-1">
-          <h3 className="text-base font-bold text-slate-900 dark:text-white">
-            Running GapLens AI Gap-Detection Engine
+          <h3 className="text-base font-bold text-zinc-900 dark:text-white">
+            Cross-Auditing Sources
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Cross-auditing sources via{' '}
-            <span className="font-mono font-semibold text-indigo-600 dark:text-indigo-400">
-              {activeModel || 'Free Tier Failover Queue'}
+          <p className="text-xs text-zinc-400">
+            Evaluating regulatory corpus using{' '}
+            <span className="font-mono font-semibold text-zinc-900 dark:text-white">
+              {activeModel?.split('/')[1]?.replace(':free', '') || 'AI Audit Engine'}
             </span>
           </p>
         </div>
 
-        {/* Progressive Pipeline Steps */}
-        <div className="space-y-2.5 text-left rounded-2xl border border-slate-100 bg-slate-50/80 p-3.5 dark:border-slate-800 dark:bg-slate-950/60">
-          {ANALYSIS_STEPS.map((step, idx) => {
-            const Icon = step.icon;
-            const isFinished = currentStepIndex > idx;
-            const isCurrent = currentStepIndex === idx;
+        {/* Dynamic Progress Steps */}
+        <div className="space-y-2 text-left">
+          {ANALYSIS_STEPS.map((s, idx) => {
+            const Icon = s.icon;
+            const isDone = idx < currentStepIndex;
+            const isCurrent = idx === currentStepIndex;
 
             return (
               <div
                 key={idx}
-                className={`flex items-center space-x-2.5 text-xs transition-opacity ${
-                  isFinished
-                    ? 'text-emerald-700 dark:text-emerald-400 font-medium'
-                    : isCurrent
-                    ? 'text-indigo-600 dark:text-indigo-300 font-bold'
-                    : 'text-slate-400 dark:text-slate-600 opacity-60'
+                className={`flex items-center space-x-2.5 rounded-xl p-2.5 text-xs transition-all ${
+                  isCurrent
+                    ? 'border border-zinc-900/40 bg-zinc-100 font-semibold text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white'
+                    : isDone
+                    ? 'text-zinc-400 opacity-60'
+                    : 'text-zinc-300 dark:text-zinc-700'
                 }`}
               >
                 <div
                   className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${
-                    isFinished
-                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
-                      : isCurrent
-                      ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300 animate-pulse'
-                      : 'bg-slate-200/60 text-slate-400 dark:bg-slate-800 dark:text-slate-600'
+                    isCurrent
+                      ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                      : isDone
+                      ? 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
+                      : 'bg-zinc-100 text-zinc-400 dark:bg-zinc-850 dark:text-zinc-600'
                   }`}
                 >
-                  {isFinished ? (
-                    <FileCheck className="h-3 w-3" />
-                  ) : isCurrent ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <Icon className="h-3 w-3" />
-                  )}
+                  <Icon className="h-3 w-3" />
                 </div>
-                <span className="truncate">{step.label}</span>
+                <span className="truncate">{s.label}</span>
               </div>
             );
           })}
         </div>
 
-        <p className="text-[11px] text-slate-400 dark:text-slate-500">
-          Multi-Model failover active &bull; Anti-Hallucination guardrails enforced
+        <p className="text-[10px] text-zinc-400 font-mono">
+          Detecting omissions &bull; Cross-checking limits &bull; Flagging drift
         </p>
-
       </div>
     </div>
   );
 }
-

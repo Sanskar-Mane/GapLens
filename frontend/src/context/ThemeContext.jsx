@@ -10,7 +10,7 @@ export function ThemeProvider({ children }) {
         return savedTheme;
       }
     }
-    return 'dark'; // Default to analytical dark theme
+    return 'light'; // Default to modern monochrome light theme
   });
 
   useEffect(() => {

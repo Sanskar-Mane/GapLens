@@ -2,7 +2,8 @@
  * Client-Side Backup Sample Scenarios & Precomputed Analyses for GapLens
  * Problem Statement: Digital Dark Spot (Shinchan Online Hackathon 2026)
  *
- * Ensures instant 1-click loading and zero-latency demonstration even if backend is offline.
+ * Ensures instant 1-click loading, verifiable evidence quotes, and zero-latency
+ * demonstration even if the backend is offline.
  */
 
 export const FALLBACK_SCENARIOS = [
@@ -145,6 +146,14 @@ export const FALLBACK_ANALYSES = {
       'Current Submission Deadline',
       'Annual Renewal & Attendance Policy',
     ],
+    rubricStatus: [
+      { parameter: 'Eligibility & Minimum Marks', status: 'verified', linkedIds: ['fact-1'] },
+      { parameter: 'Family Income Limit', status: 'conflict', linkedIds: ['conf-1'] },
+      { parameter: 'Required Documents List', status: 'conflict', linkedIds: ['conf-2', 'fact-2'] },
+      { parameter: 'Application Mode & Portal', status: 'conflict', linkedIds: ['conf-3', 'fact-1'] },
+      { parameter: 'Current Submission Deadline', status: 'missing', linkedIds: ['gap-2', 'time-1'] },
+      { parameter: 'Annual Renewal & Attendance Policy', status: 'missing', linkedIds: ['gap-1'] },
+    ],
     sourcedFacts: [
       {
         id: 'fact-1',
@@ -154,6 +163,8 @@ export const FALLBACK_ANALYSES = {
         sourceIds: ['src-1'],
         sourceTitles: ['Official State Scholarship Portal Guidelines'],
         confidence: 'High (Official Source)',
+        evidenceQuote:
+          'Applicants must be domiciled in the state and have secured at least 75% marks in the previous qualifying examination.',
       },
       {
         id: 'fact-2',
@@ -163,6 +174,8 @@ export const FALLBACK_ANALYSES = {
         sourceIds: ['src-1'],
         sourceTitles: ['Official State Scholarship Portal Guidelines'],
         confidence: 'High (Official Source)',
+        evidenceQuote:
+          'Mandatory Documents: Aadhaar Card, Previous Year Marksheet, Bank Passbook copy (Aadhaar seeded), and Income Certificate issued by the competent Tehsildar office.',
       },
       {
         id: 'fact-3',
@@ -172,6 +185,8 @@ export const FALLBACK_ANALYSES = {
         sourceIds: ['src-2'],
         sourceTitles: ['EduCareer Student Guidance Blog'],
         confidence: 'Medium (Third-Party Guide)',
+        evidenceQuote:
+          'The State Post-Matric Scholarship covers undergraduate engineering and degree courses.',
       },
       {
         id: 'fact-4',
@@ -181,6 +196,8 @@ export const FALLBACK_ANALYSES = {
         sourceIds: ['src-4'],
         sourceTitles: ['Student Community Hostel Allowance FAQ'],
         confidence: 'Low (Unverified Community Post)',
+        evidenceQuote:
+          'Hostel students residing in recognized private hostels or paying guest accommodations receive an additional maintenance allowance of Rs. 1,200 per month',
       },
     ],
     informationGaps: [
@@ -225,11 +242,15 @@ export const FALLBACK_ANALYSES = {
           sourceId: 'src-1',
           title: 'Official State Scholarship Portal Guidelines',
           claim: 'Annual family income from all sources must not exceed Rs. 2,50,000.',
+          evidenceQuote:
+            'Annual family income from all combined sources must not exceed Rs. 2,50,000.',
         },
         sourceB: {
           sourceId: 'src-2',
           title: 'EduCareer Student Guidance Blog',
           claim: 'Students with a family income up to Rs. 8,00,000 per annum are eligible to apply.',
+          evidenceQuote:
+            'Students with an annual family income up to Rs. 8,00,000 per annum and minimum 60% marks in previous examinations are eligible to apply.',
         },
         resolutionAdvice:
           'Verify whether the Rs. 2.5 Lakh cap applies to specific categories while Rs. 8.0 Lakh applies to EBC/OBC tiers on the official portal.',
@@ -243,11 +264,15 @@ export const FALLBACK_ANALYSES = {
           sourceId: 'src-1',
           title: 'Official State Scholarship Portal Guidelines',
           claim: 'Requires an official Income Certificate issued by the Tehsildar.',
+          evidenceQuote:
+            'Income Certificate issued by the competent Tehsildar office.',
         },
         sourceB: {
           sourceId: 'src-2',
           title: 'EduCareer Student Guidance Blog',
           claim: 'States a self-attested income declaration on Rs. 100 stamp paper is sufficient.',
+          evidenceQuote:
+            'self-attested income declaration on a Rs. 100 stamp paper',
         },
         resolutionAdvice:
           'Do not rely on a stamp-paper affidavit; apply for a Tehsildar-issued digital income certificate.',
@@ -261,11 +286,15 @@ export const FALLBACK_ANALYSES = {
           sourceId: 'src-1',
           title: 'Official State Scholarship Portal Guidelines',
           claim: 'Requires 75% marks and strictly online portal submission.',
+          evidenceQuote:
+            'All applications must be submitted online via the official scholarship portal.',
         },
         sourceB: {
           sourceId: 'src-3',
           title: 'Regional Directorate Circular Archive',
           claim: 'Requires offline hard-copy submission to the District Nodal Officer.',
+          evidenceQuote:
+            'submit hard copies of their application form along with original verification slips to the District Nodal Officer on or before 15th November 2023.',
         },
         resolutionAdvice:
           'Source 3 is from the 2023-24 cycle; follow the online submission workflow in Source 1.',
@@ -280,6 +309,8 @@ export const FALLBACK_ANALYSES = {
         warningType: 'Outdated Cycle',
         riskDescription:
           'Refers to the 2023-24 academic cycle and offline submission procedures that have likely been superseded.',
+        evidenceQuote:
+          'All eligible scholarship candidates for the 2023-24 academic cycle must submit hard copies of their application form along with original verification slips to the District Nodal Officer on or before 15th November 2023.',
       },
       {
         id: 'time-2',
@@ -289,6 +320,8 @@ export const FALLBACK_ANALYSES = {
         warningType: 'Missing Publication Date',
         riskDescription:
           'Claims a Rs. 1,200/month hostel allowance without citing a notification date or official circular number.',
+        evidenceQuote:
+          'Hostel students residing in recognized private hostels or paying guest accommodations receive an additional maintenance allowance of Rs. 1,200 per month',
       },
     ],
     verificationChecklist: [
@@ -326,6 +359,7 @@ export const FALLBACK_ANALYSES = {
       },
     ],
   },
+
   'fssai-cloud-kitchen': {
     readinessScore: 48,
     readinessLabel: 'Moderate Risk — Turnover Discrepancy & Missing Fire Safety NOC',
@@ -339,6 +373,14 @@ export const FALLBACK_ANALYSES = {
       'Shop & Establishment Act Registration',
       'Annual Renewal Window & Penalties',
     ],
+    rubricStatus: [
+      { parameter: 'Turnover Threshold & FSSAI Category', status: 'conflict', linkedIds: ['conf-1', 'fact-1'] },
+      { parameter: 'Potable Water & Health Fitness Test', status: 'verified', linkedIds: ['fact-1'] },
+      { parameter: 'Municipal Health Trade License (PMC)', status: 'verified', linkedIds: ['fact-2'] },
+      { parameter: 'Fire Safety NOC & Commercial LPG Rules', status: 'missing', linkedIds: ['gap-1', 'conf-2', 'time-1'] },
+      { parameter: 'Shop & Establishment Act Registration', status: 'missing', linkedIds: ['gap-2'] },
+      { parameter: 'Annual Renewal Window & Penalties', status: 'verified', linkedIds: ['fact-3'] },
+    ],
     sourcedFacts: [
       {
         id: 'fact-1',
@@ -348,6 +390,8 @@ export const FALLBACK_ANALYSES = {
         sourceIds: ['src-1'],
         sourceTitles: ['Food Safety Authority Portal (FSSAI Registration Standard)'],
         confidence: 'High (Official Source)',
+        evidenceQuote:
+          'Home-based food operators, tiffin providers, and cloud kitchens having an annual turnover of up to Rs. 12 Lakhs are required to obtain only a Basic FSSAI Registration Certificate (Form A).',
       },
       {
         id: 'fact-2',
@@ -357,6 +401,8 @@ export const FALLBACK_ANALYSES = {
         sourceIds: ['src-2'],
         sourceTitles: ['Municipal Corporation Trade Licensing Advisory (PMC)'],
         confidence: 'Medium (Municipal Advisory)',
+        evidenceQuote:
+          'Commercial food preparation and delivery establishments operating within Pune Municipal Corporation limits require a Municipal Health Trade License and commercial electricity meter.',
       },
       {
         id: 'fact-3',
@@ -366,6 +412,8 @@ export const FALLBACK_ANALYSES = {
         sourceIds: ['src-1'],
         sourceTitles: ['Food Safety Authority Portal (FSSAI Registration Standard)'],
         confidence: 'High (Official Source)',
+        evidenceQuote:
+          'Annual renewal must be applied 30 days prior to certificate expiry.',
       },
     ],
     informationGaps: [
@@ -389,6 +437,16 @@ export const FALLBACK_ANALYSES = {
         explanation:
           'Commercial food sales generally require Gumasta registration, but this condition is completely omitted across all sources.',
       },
+      {
+        id: 'gap-3',
+        title: 'PMC Health Trade License Processing Schedule Unspecified',
+        missingQuestion:
+          'What is the turnaround time, inspection fee, and document checklist for obtaining the PMC Municipal Health Trade License in 2026?',
+        impactLevel: 'Medium',
+        signalLabel: 'Potential Gap — AI Signal',
+        explanation:
+          'Source 2 mentions the trade license requirement but does not list the application portal or fee schedule.',
+      },
     ],
     contradictions: [
       {
@@ -400,14 +458,40 @@ export const FALLBACK_ANALYSES = {
           sourceId: 'src-1',
           title: 'Food Safety Authority Portal (FSSAI Registration Standard)',
           claim: 'Turnover up to Rs. 12 Lakhs requires Basic FSSAI Registration (Form A).',
+          evidenceQuote:
+            'annual turnover of up to Rs. 12 Lakhs are required to obtain only a Basic FSSAI Registration Certificate (Form A).',
         },
         sourceB: {
           sourceId: 'src-2',
           title: 'Municipal Corporation Trade Licensing Advisory (PMC)',
           claim: 'Turnover exceeding Rs. 20 Lakhs or connected load >5KW triggers State FSSAI License.',
+          evidenceQuote:
+            'turnover exceeding Rs. 20 Lakhs must obtain a State FSSAI License rather than Basic Registration.',
         },
         resolutionAdvice:
           'FSSAI national regulations strictly mandate State Licensing above Rs. 12 Lakhs per annum. Do not rely on the Rs. 20 Lakh figure on FoSCoS.',
+      },
+      {
+        id: 'conf-2',
+        parameter: 'Fire Safety Exemption for Domestic LPG Users',
+        severity: 'High Conflict',
+        signalLabel: 'Possible Conflict Between Sources',
+        sourceA: {
+          sourceId: 'src-2',
+          title: 'Municipal Corporation Trade Licensing Advisory (PMC)',
+          claim: 'Mandates commercial electricity meter and health trade compliance for all commercial food preparation.',
+          evidenceQuote:
+            'require a Municipal Health Trade License and commercial electricity meter.',
+        },
+        sourceB: {
+          sourceId: 'src-3',
+          title: 'Archived Restaurant & Cloud Kitchen Fee Schedule',
+          claim: 'Fire department NOC and pollution clearance are exempt for domestic LPG cylinder users under 20 orders/day.',
+          evidenceQuote:
+            'Fire department NOC and effluent pollution clearance are exempt for domestic LPG cylinder users operating below 20 orders per day.',
+        },
+        resolutionAdvice:
+          'Source 3 is an archived 2021 circular; domestic LPG exemptions have been superseded by current commercial fire bylaws.',
       },
     ],
     outdatedWarnings: [
@@ -419,6 +503,8 @@ export const FALLBACK_ANALYSES = {
         warningType: 'Outdated Circular',
         riskDescription:
           'Refers to a 2021 municipal fee schedule and obsolete fire exemptions that no longer reflect 2026 safety standards.',
+        evidenceQuote:
+          'Under the 2021 Municipal Schedule, small food establishments pay a flat inspection fee of Rs. 1,500.',
       },
     ],
     verificationChecklist: [
@@ -438,8 +524,25 @@ export const FALLBACK_ANALYSES = {
         targetAuthority: 'PMC Health Dept / Chief Fire Officer Pune',
         reason: 'Fire safety criteria are missing from 2026 sources and exempt only in an outdated 2021 circular.',
       },
+      {
+        id: 'chk-3',
+        priority: 'Medium',
+        actionItem:
+          'Apply for Maharashtra Shop & Establishment Act Intimation / Registration online on Aaple Sarkar.',
+        targetAuthority: 'Maharashtra Labor Department (Aaple Sarkar)',
+        reason: 'Completely omitted from all reviewed sources.',
+      },
+      {
+        id: 'chk-4',
+        priority: 'Low',
+        actionItem:
+          'Schedule NABL-accredited water testing for potable water safety certificate upload.',
+        targetAuthority: 'NABL Accredited Water Testing Laboratory',
+        reason: 'Mandatory prerequisite for Form A basic registration approval.',
+      },
     ],
   },
+
   'overseas-edu-subsidy': {
     readinessScore: 52,
     readinessLabel: 'Moderate Risk — Parental Income Discrepancy & Missing Part-Time Course Policy',
@@ -453,6 +556,14 @@ export const FALLBACK_ANALYSES = {
       'Mandatory Income Proof & Tehsildar Document',
       'Annual Progress Report & Bank Renewal Procedure',
     ],
+    rubricStatus: [
+      { parameter: 'Parental Income Ceiling', status: 'conflict', linkedIds: ['conf-1'] },
+      { parameter: 'Approved Foreign University & Degree Types', status: 'verified', linkedIds: ['fact-2'] },
+      { parameter: 'Eligible Study Modes (Full-Time vs Hybrid/Online)', status: 'missing', linkedIds: ['gap-1'] },
+      { parameter: 'Moratorium Period & Subsidy Disbursal', status: 'verified', linkedIds: ['fact-1'] },
+      { parameter: 'Mandatory Income Proof & Tehsildar Document', status: 'conflict', linkedIds: ['conf-2'] },
+      { parameter: 'Annual Progress Report & Bank Renewal Procedure', status: 'verified', linkedIds: ['fact-3', 'gap-3', 'time-1'] },
+    ],
     sourcedFacts: [
       {
         id: 'fact-1',
@@ -462,6 +573,8 @@ export const FALLBACK_ANALYSES = {
         sourceIds: ['src-1'],
         sourceTitles: ['Ministry of Education Scheme Portal (CSIS Overseas Guidelines)'],
         confidence: 'High (Official Source)',
+        evidenceQuote:
+          'full interest subsidy is provided during the moratorium period (course duration plus 1 year) on educational loans availed from scheduled banks.',
       },
       {
         id: 'fact-2',
@@ -471,6 +584,19 @@ export const FALLBACK_ANALYSES = {
         sourceIds: ['src-1'],
         sourceTitles: ['Ministry of Education Scheme Portal (CSIS Overseas Guidelines)'],
         confidence: 'High (Official Source)',
+        evidenceQuote:
+          'Applicable only for full-time Master’s and Ph.D. programs in approved foreign universities.',
+      },
+      {
+        id: 'fact-3',
+        category: 'Bank Renewal Requirement',
+        statement:
+          'Borrowers must submit annual academic progress reports and income renewal certificates to their loan disbursing branch.',
+        sourceIds: ['src-3'],
+        sourceTitles: ['Nationalized Bank Education Loan Customer Brochure'],
+        confidence: 'Medium (Bank Brochure)',
+        evidenceQuote:
+          'Borrowers must submit annual academic progress reports and income renewal certificates to their home branch.',
       },
     ],
     informationGaps: [
@@ -484,6 +610,26 @@ export const FALLBACK_ANALYSES = {
         explanation:
           'None of the 3 sources clarify whether non-traditional, hybrid, or online master’s programs qualify for central subsidy funds.',
       },
+      {
+        id: 'gap-2',
+        title: 'Foreign University Ranking Thresholds Unspecified',
+        missingQuestion:
+          'Does the CSIS overseas scheme enforce a specific QS or Times Higher Education global top 500 ranking cutoff for participating foreign universities?',
+        impactLevel: 'High',
+        signalLabel: 'Potential Gap — Unanswered Question',
+        explanation:
+          'Source 1 mentions "approved foreign universities" but does not provide an official annexure or ranking threshold list.',
+      },
+      {
+        id: 'gap-3',
+        title: 'Annual Progress Submission Deadlines Undefined',
+        missingQuestion:
+          'What is the exact calendar date by which borrowers must submit annual academic progress reports to prevent subsidy stoppage?',
+        impactLevel: 'Medium',
+        signalLabel: 'Potential Gap — AI Signal',
+        explanation:
+          'Source 3 references annual progress submission in an undated brochure without specifying quarterly or annual cutoff dates.',
+      },
     ],
     contradictions: [
       {
@@ -495,14 +641,40 @@ export const FALLBACK_ANALYSES = {
           sourceId: 'src-1',
           title: 'Ministry of Education Scheme Portal (CSIS Overseas Guidelines)',
           claim: 'Annual gross parental income from all sources must not exceed Rs. 4,50,000 per annum.',
+          evidenceQuote:
+            'Annual gross parental income from all sources must not exceed Rs. 4,50,000 per annum.',
         },
         sourceB: {
           sourceId: 'src-2',
           title: 'Global Education Finance Advisory Blog',
           claim: 'Students can claim government interest subsidy if family income is up to Rs. 6,00,000 per annum.',
+          evidenceQuote:
+            'Students admitted to STEM and business management master’s programs abroad can claim the government interest subsidy if family income is up to Rs. 6,00,000 per annum.',
         },
         resolutionAdvice:
           'CSIS central guidelines strictly enforce the Rs. 4.50 Lakh EBC cap. The Rs. 6 Lakh figure likely refers to a state-level minority subsidy.',
+      },
+      {
+        id: 'conf-2',
+        parameter: 'Income Proof Verification Requirement',
+        severity: 'High Conflict',
+        signalLabel: 'Possible Conflict Between Sources',
+        sourceA: {
+          sourceId: 'src-1',
+          title: 'Ministry of Education Scheme Portal (CSIS Overseas Guidelines)',
+          claim: 'Requires an official Income Certificate issued by competent revenue authority.',
+          evidenceQuote:
+            'Under the Central Scheme to Provide Interest Subsidy (CSIS) for Overseas Studies',
+        },
+        sourceB: {
+          sourceId: 'src-2',
+          title: 'Global Education Finance Advisory Blog',
+          claim: 'Self-declared income affidavit and admission offer letter are sufficient.',
+          evidenceQuote:
+            'A self-declared income affidavit and admission offer letter from any accredited foreign institute are sufficient to initiate subsidy disbursement with partner banks.',
+        },
+        resolutionAdvice:
+          'Nationalized banks reject self-declarations; an income certificate issued by a Sub-Divisional Magistrate or Tehsildar is mandatory.',
       },
     ],
     outdatedWarnings: [
@@ -514,6 +686,8 @@ export const FALLBACK_ANALYSES = {
         warningType: 'Missing Publication Date',
         riskDescription:
           'Brochure contains no publication date or circular number, leaving annual progress submission windows unverifiable.',
+        evidenceQuote:
+          'The brochure does not state whether part-time or executive online master’s programs qualify for the interest subsidy.',
       },
     ],
     verificationChecklist: [
@@ -524,6 +698,30 @@ export const FALLBACK_ANALYSES = {
           'Confirm the Rs. 4.5 Lakh income ceiling with your scheduled commercial bank’s education loan nodal officer.',
         targetAuthority: 'Canara Bank (Nodal Scheme Administrator) / CSIS Guidelines',
         reason: 'Direct contradiction between Rs. 4.5L and Rs. 6.0L income ceilings across sources.',
+      },
+      {
+        id: 'chk-2',
+        priority: 'High',
+        actionItem:
+          'Obtain a formal Income Certificate from the Tehsildar/Revenue Authority before visa and bank filing.',
+        targetAuthority: 'District Revenue Office / Tehsildar',
+        reason: 'Blog advice advocating a self-affidavit will lead to bank loan subsidy disqualification.',
+      },
+      {
+        id: 'chk-3',
+        priority: 'Medium',
+        actionItem:
+          'Verify whether the prospective foreign university and degree mode (full-time vs hybrid) qualify under CSIS.',
+        targetAuthority: 'Ministry of Education (CSIS Overseas Cell)',
+        reason: 'Online and executive degrees are not addressed in the reviewed materials.',
+      },
+      {
+        id: 'chk-4',
+        priority: 'Low',
+        actionItem:
+          'Request the latest bank circular outlining the annual academic progress report submission cutoff dates.',
+        targetAuthority: 'Lending Bank Home Branch Manager',
+        reason: 'Bank brochure is undated and lacks specific calendar deadlines.',
       },
     ],
   },

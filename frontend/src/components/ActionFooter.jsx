@@ -14,6 +14,7 @@ export default function ActionFooter({
   sources,
   activeModel,
   hasOpenRouterKey,
+  hasGeminiKey,
   forceOfflineDemo,
   isAnalyzing,
   onTriggerAnalysis,
@@ -30,12 +31,18 @@ export default function ActionFooter({
   const hasUndatedWarning = undatedSources.length > 0;
 
   const isFormValid = isTopicValid && hasEnoughSources;
+  const hasKey = Boolean(hasGeminiKey || hasOpenRouterKey);
 
-  // Friendly short model label
+  // Friendly short model label from .env
   const getShortModel = (model) => {
-    if (!model) return 'Llama 3.3 70B';
+    if (!model) return 'Configured Model (.env)';
     const parts = model.split('/');
-    return (parts[1] || model).replace(':free', ' (Free)');
+    const rawName = (parts.length > 1 ? parts.slice(1).join('/') : parts[0]).replace(/:free$/i, '');
+    const cleanName = rawName
+      .split(/[-_]/)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+    return `${cleanName}${model.includes(':free') ? ' (Free)' : ''}`;
   };
 
   return (
@@ -91,7 +98,7 @@ export default function ActionFooter({
 
         </div>
 
-        {/* Selected OpenRouter Model Badge */}
+        {/* Selected AI Model Badge */}
         <div className="flex items-center space-x-2 text-xs text-slate-500 dark:text-slate-400">
           <Cpu className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
           <span>Engine:</span>
@@ -102,12 +109,12 @@ export default function ActionFooter({
             className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
               forceOfflineDemo
                 ? 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800'
-                : hasOpenRouterKey
+                : hasKey
                 ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800'
                 : 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-950 dark:text-indigo-300 dark:border-indigo-800'
             }`}
           >
-            {forceOfflineDemo ? 'Demo Mode' : hasOpenRouterKey ? 'Live AI' : 'Preset'}
+            {forceOfflineDemo ? 'Demo Mode' : hasKey ? 'Live AI' : 'Preset'}
           </span>
         </div>
 

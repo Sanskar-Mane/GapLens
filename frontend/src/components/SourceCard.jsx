@@ -7,10 +7,9 @@ import {
   Clock,
   FileUp,
   CalendarSearch,
-  CheckCircle2,
+  Check,
   AlertTriangle,
   ExternalLink,
-  ShieldAlert
 } from 'lucide-react';
 import { extractUrlContent, scanTextMetadata } from '../services/api';
 
@@ -21,14 +20,6 @@ const SOURCE_TYPES = [
   'News Article',
   'Forum/Other',
 ];
-
-const SOURCE_TYPE_COLORS = {
-  'Official Notice': 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/60',
-  'Third-Party Guide': 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800/60',
-  'Archived Circular': 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800/60',
-  'News Article': 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/60',
-  'Forum/Other': 'bg-slate-200 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
-};
 
 export default function SourceCard({
   source,
@@ -83,7 +74,7 @@ export default function SourceCard({
     onUpdateSource(source.id, { [field]: val });
   };
 
-  // 1. Auto-Extract URL content with Jina AI / Cheerio / Firewall guard
+  // Auto-Extract URL content with Jina AI / Cheerio / Firewall guard
   const handleExtractUrl = async () => {
     if (!source.url || !source.url.trim()) {
       setExtractError('Please enter a valid URL first (e.g. https://...).');
@@ -98,109 +89,100 @@ export default function SourceCard({
     setExtracting(false);
 
     if (result.success && result.content) {
-      onUpdateSource(source.id, {
-        content: result.content,
-        title: source.title || result.title || 'Extracted Web Article',
-        publishedDate: source.publishedDate || result.detectedDate || '',
-      });
-      setTemporalInfo({
-        temporalStatus: result.temporalStatus || 'current',
-        detectedDate: result.detectedDate || '',
-      });
-      setExtractSuccess(
-        `Scraped ${result.wordCount || result.content.length} words via ${result.extractedVia || 'Extraction Engine'}!`
-      );
+      handleFieldChange('content', result.content);
+      if (result.title && (!source.title || source.title.startsWith('Source '))) {
+        handleFieldChange('title', result.title);
+      }
+      if (result.detectedDate && !source.publishedDate) {
+        handleFieldChange('publishedDate', result.detectedDate);
+      }
+      setExtractSuccess(`Extracted ${result.content.length} characters.`);
+      setTimeout(() => setExtractSuccess(null), 4000);
     } else {
-      setExtractError(
-        result.error ||
-          'Extraction failed. The target site may be protected by a bot firewall (Cloudflare) or require authentication. Please copy and paste the snippet directly.'
-      );
-    }
-
-    setTimeout(() => {
-      setExtractSuccess(null);
-    }, 6000);
-  };
-
-  // 2. Auto-Detect Date from Text button action
-  const handleAutoDetectDate = async () => {
-    if (!source.content || source.content.trim().length < 10) {
-      setExtractError('Please paste content first to scan for dates or academic cycles.');
-      setTimeout(() => setExtractError(null), 3000);
-      return;
-    }
-
-    setDetectingDate(true);
-    const meta = await scanTextMetadata(source.content, source.publishedDate);
-    setDetectingDate(false);
-
-    if (meta.detectedDate) {
-      onUpdateSource(source.id, { publishedDate: meta.detectedDate });
-      setTemporalInfo({
-        temporalStatus: meta.temporalStatus,
-        detectedDate: meta.detectedDate,
-      });
-      setExtractSuccess(`Auto-detected: "${meta.detectedDate}"`);
-      setTimeout(() => setExtractSuccess(null), 3000);
-    } else {
-      setExtractError('No explicit dates or academic cycles found in the content snippet.');
-      setTimeout(() => setExtractError(null), 4000);
+      setExtractError(result.message || 'Failed to extract web content.');
     }
   };
 
-  // 3. Upload .txt/.md local file
+  // Local File Upload (.txt or .md)
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = async (event) => {
+    reader.onload = (event) => {
       const text = event.target?.result;
       if (typeof text === 'string') {
-        const derivedTitle = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-        const scan = await scanTextMetadata(text);
-        onUpdateSource(source.id, {
-          content: text,
-          title: source.title || derivedTitle,
-          publishedDate: source.publishedDate || scan.detectedDate || '',
-        });
-        setExtractSuccess(`Loaded file "${file.name}" (${text.length} chars)!`);
-        setTimeout(() => setExtractSuccess(null), 4000);
+        handleFieldChange('content', text);
+        const fileNameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
+        if (!source.title || source.title.startsWith('Source ')) {
+          handleFieldChange('title', fileNameWithoutExt);
+        }
+        setExtractSuccess(`Loaded file "${file.name}" (${text.length} characters)`);
+        setTimeout(() => setExtractSuccess(null), 3000);
       }
     };
     reader.readAsText(file);
-    // Reset file input value so user can upload same file if needed
     e.target.value = '';
   };
 
+  // Auto-Detect Date
+  const handleAutoDetectDate = async () => {
+    if (!source.content) return;
+    setDetectingDate(true);
+    const res = await scanTextMetadata(source.content, source.publishedDate);
+    setDetectingDate(false);
+
+    if (res.detectedDate) {
+      handleFieldChange('publishedDate', res.detectedDate);
+      setTemporalInfo({
+        temporalStatus: res.temporalStatus,
+        detectedDate: res.detectedDate,
+      });
+      setExtractSuccess(`Detected date: ${res.detectedDate}`);
+      setTimeout(() => setExtractSuccess(null), 3000);
+    } else {
+      setExtractError('No dates detected in text.');
+      setTimeout(() => setExtractError(null), 3000);
+    }
+  };
+
   return (
-    <div className="relative rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/95 dark:hover:border-slate-700">
+    <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-soft dark:border-zinc-800 dark:bg-zinc-900 transition-colors">
       
-      {/* Top Bar: Source Badge ([Source 1]), Type Selector, Upload Button, and Delete */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+      {/* Top Bar: Source ID, Type, Date Status, Upload & Delete */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-3">
         
-        {/* Source Badge */}
+        {/* Source ID and Type */}
         <div className="flex items-center space-x-2">
-          <span className="rounded-lg bg-indigo-50 px-2.5 py-1 font-mono text-xs font-bold text-indigo-700 ring-1 ring-indigo-200 dark:bg-indigo-950 dark:text-indigo-300 dark:ring-indigo-800">
-            [Source {index + 1}]
+          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-xs font-mono font-bold">
+            {index + 1}
           </span>
-          <span
-            className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold ${
-              SOURCE_TYPE_COLORS[source.sourceType] || 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-            }`}
-          >
-            {source.sourceType}
+          <span className="text-xs font-mono font-bold text-zinc-900 dark:text-white">
+            {source.id || `src-${index + 1}`}
           </span>
+
+          {/* Temporal status dot badge */}
+          {temporalInfo.temporalStatus === 'undated' && (
+            <span className="inline-flex items-center space-x-1 rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-700 dark:text-zinc-300 border border-zinc-200/60 dark:border-zinc-700/60">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+              <span>Undated</span>
+            </span>
+          )}
+
+          {temporalInfo.temporalStatus === 'outdated' && (
+            <span className="inline-flex items-center space-x-1 rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-700 dark:text-zinc-300 border border-zinc-200/60 dark:border-zinc-700/60">
+              <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+              <span>Outdated Cycle</span>
+            </span>
+          )}
         </div>
 
-        {/* Action icons & buttons */}
+        {/* Type Select, File Upload, Delete Action */}
         <div className="flex items-center space-x-2">
-          
-          {/* Source Type Selector */}
           <select
             value={source.sourceType}
             onChange={(e) => handleFieldChange('sourceType', e.target.value)}
-            className="rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
+            className="rounded-xl border border-zinc-200/80 bg-zinc-50 px-2.5 py-1 text-xs font-medium text-zinc-800 focus:border-zinc-900 focus:outline-hidden dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
           >
             {SOURCE_TYPES.map((type) => (
               <option key={type} value={type}>
@@ -221,13 +203,13 @@ export default function SourceCard({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             title="Upload local .txt or .md document"
-            className="inline-flex items-center space-x-1 rounded-lg border border-slate-300 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-750 transition-colors shadow-xs"
+            className="inline-flex items-center space-x-1 rounded-xl border border-zinc-200/80 bg-zinc-50 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-750 transition-colors"
           >
-            <FileUp className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-            <span className="hidden sm:inline">Upload .txt/.md</span>
+            <FileUp className="h-3.5 w-3.5 text-zinc-600 dark:text-zinc-400" />
+            <span className="hidden sm:inline">Upload File</span>
           </button>
 
-          {/* Delete Source button (disabled when only 2 sources remain) */}
+          {/* Delete Source button */}
           <button
             type="button"
             disabled={totalSources <= 2}
@@ -237,10 +219,10 @@ export default function SourceCard({
                 ? 'Minimum 2 sources required for cross-verification'
                 : 'Remove this source'
             }
-            className={`rounded-lg p-1.5 transition-colors ${
+            className={`rounded-xl p-1.5 transition-colors ${
               totalSources <= 2
-                ? 'cursor-not-allowed text-slate-300 dark:text-slate-700'
-                : 'text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/50 dark:hover:text-rose-400'
+                ? 'cursor-not-allowed text-zinc-300 dark:text-zinc-700'
+                : 'text-zinc-400 hover:bg-zinc-100 hover:text-rose-600 dark:hover:bg-zinc-800 dark:hover:text-rose-400'
             }`}
           >
             <Trash2 className="h-4 w-4" />
@@ -254,7 +236,7 @@ export default function SourceCard({
         
         {/* Source Title */}
         <div className="sm:col-span-5">
-          <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-1">
             Source Title
           </label>
           <input
@@ -262,47 +244,43 @@ export default function SourceCard({
             value={source.title}
             onChange={(e) => handleFieldChange('title', e.target.value)}
             placeholder="Official State Portal"
-            className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder-slate-600 dark:focus:bg-slate-950"
+            className="w-full rounded-xl border border-zinc-200/80 bg-zinc-50 px-3 py-2 text-xs text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:bg-white focus:outline-hidden font-medium dark:border-zinc-700 dark:bg-zinc-850 dark:text-zinc-100 dark:placeholder-zinc-600 dark:focus:border-white"
           />
         </div>
 
         {/* Publication Date / Cycle + Auto-Detect Button */}
         <div className="sm:col-span-3">
           <div className="flex items-center justify-between mb-1">
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
               Date / Cycle
             </label>
             <button
               type="button"
               disabled={detectingDate || !source.content}
               onClick={handleAutoDetectDate}
-              title="Auto-scan pasted content to detect dates and cycles"
-              className="inline-flex items-center space-x-1 text-[10px] font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 disabled:opacity-40 transition-colors"
+              title="Auto-scan pasted content to detect dates"
+              className="inline-flex items-center space-x-1 text-[10px] font-semibold text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white disabled:opacity-40 transition-colors"
             >
               {detectingDate ? (
                 <Loader2 className="h-2.5 w-2.5 animate-spin" />
               ) : (
                 <CalendarSearch className="h-2.5 w-2.5" />
               )}
-              <span>Auto-Detect</span>
+              <span>Detect</span>
             </button>
           </div>
           <input
             type="text"
             value={source.publishedDate}
             onChange={(e) => handleFieldChange('publishedDate', e.target.value)}
-            placeholder="Sept 2026, 2023-24, or blank"
-            className={`w-full rounded-lg border px-3 py-2 text-xs font-mono text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 dark:text-slate-100 dark:placeholder-slate-600 ${
-              !source.publishedDate || !source.publishedDate.trim()
-                ? 'border-amber-300 bg-amber-50/70 focus:border-amber-500 focus:ring-amber-500 dark:border-amber-700/60 dark:bg-amber-950/20'
-                : 'border-slate-300 bg-slate-50 focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950'
-            }`}
+            placeholder="e.g. Sept 2026, 2023, or blank"
+            className="w-full rounded-xl border border-zinc-200/80 bg-zinc-50 px-3 py-2 text-xs font-mono text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:outline-hidden dark:border-zinc-700 dark:bg-zinc-850 dark:text-zinc-100 dark:placeholder-zinc-600 dark:focus:border-white"
           />
         </div>
 
         {/* URL Input + Auto-Extract Button */}
         <div className="sm:col-span-4">
-          <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-1">
             Source URL
           </label>
           <div className="flex space-x-1.5">
@@ -311,117 +289,59 @@ export default function SourceCard({
               value={source.url}
               onChange={(e) => handleFieldChange('url', e.target.value)}
               placeholder="https://..."
-              className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder-slate-600"
+              className="w-full rounded-xl border border-zinc-200/80 bg-zinc-50 px-3 py-2 text-xs font-mono text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:outline-hidden dark:border-zinc-700 dark:bg-zinc-850 dark:text-zinc-100 dark:placeholder-zinc-600 dark:focus:border-white"
             />
             <button
               type="button"
               disabled={extracting || !source.url}
               onClick={handleExtractUrl}
               title="Scrape readable text automatically from this URL"
-              className="inline-flex shrink-0 items-center space-x-1 rounded-lg border border-indigo-300 bg-indigo-50 px-2.5 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-600 hover:text-white disabled:opacity-40 transition-colors shadow-sm dark:border-indigo-700/60 dark:bg-indigo-950 dark:text-indigo-300 dark:hover:bg-indigo-900"
+              className="inline-flex items-center space-x-1 rounded-xl bg-zinc-900 px-3 py-2 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-40 transition-all shrink-0 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 shadow-soft"
             >
               {extracting ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600 dark:text-indigo-300" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <Sparkles className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                <Sparkles className="h-3.5 w-3.5" />
               )}
-              <span className="hidden lg:inline">{extracting ? 'Extracting...' : 'Auto-Extract URL'}</span>
-              <span className="lg:hidden">{extracting ? '...' : 'Extract'}</span>
+              <span className="hidden md:inline">Extract</span>
             </button>
           </div>
         </div>
 
       </div>
 
-      {/* Extraction Feedback Banners */}
+      {/* Extraction Notifications */}
+      {extractError && (
+        <div className="mt-2.5 flex items-center space-x-2 rounded-xl bg-zinc-50 p-2 text-xs text-rose-600 border border-zinc-200/60 dark:bg-zinc-850 dark:text-rose-400 dark:border-zinc-800">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+          <span>{extractError}</span>
+        </div>
+      )}
+
       {extractSuccess && (
-        <div className="mt-2.5 flex items-center space-x-2 rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+        <div className="mt-2.5 flex items-center space-x-2 rounded-xl bg-zinc-50 p-2 text-xs text-emerald-600 border border-zinc-200/60 dark:bg-zinc-850 dark:text-emerald-400 dark:border-zinc-800">
+          <Check className="h-3.5 w-3.5 shrink-0" />
           <span>{extractSuccess}</span>
         </div>
       )}
 
-      {extractError && (
-        <div className="mt-2.5 flex items-start space-x-2 rounded-lg border border-rose-300 bg-rose-50 p-2.5 text-xs text-rose-800 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
-          <ShieldAlert className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
-          <div>
-            <div className="font-semibold">URL Extraction Guard:</div>
-            <p className="mt-0.5 text-[11px] leading-relaxed opacity-90">{extractError}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Raw Text Content Textarea */}
-      <div className="mt-3">
+      {/* Content Textarea */}
+      <div className="mt-3.5">
         <div className="flex items-center justify-between mb-1">
-          <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center space-x-1">
-            <FileText className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-            <span>Raw Text / Content Excerpt</span>
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+            Source Text Extract (Evidence Corpus)
           </label>
-          <div className="flex items-center space-x-3 text-[10px] text-slate-500 font-mono">
-            <span>{charCount} characters</span>
-            {source.content && (
-              <button
-                type="button"
-                onClick={() => handleFieldChange('content', '')}
-                className="text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 transition-colors font-sans"
-                title="Clear content"
-              >
-                Clear
-              </button>
-            )}
-          </div>
+          <span className="text-[10px] font-mono text-zinc-400">
+            {wordCount} words &bull; {charCount} chars
+          </span>
         </div>
-
         <textarea
           rows={4}
           value={source.content}
           onChange={(e) => handleFieldChange('content', e.target.value)}
-          placeholder="Paste official portal text, eligibility notices, circular clauses, or third-party blog excerpts here..."
-          className="w-full resize-y rounded-xl border border-slate-300 bg-slate-100/70 p-3 text-xs text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono leading-relaxed dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:placeholder-slate-600 dark:focus:bg-slate-950"
+          placeholder="Paste or extract regulatory text, guidelines, conditions, or eligibility criteria here..."
+          className="w-full resize-y rounded-xl border border-zinc-200/80 bg-zinc-50 p-3 text-xs leading-relaxed text-zinc-800 placeholder-zinc-400 focus:border-zinc-900 focus:bg-white focus:outline-hidden dark:border-zinc-700 dark:bg-zinc-850 dark:text-zinc-100 dark:placeholder-zinc-600 dark:focus:border-white transition-all font-mono"
         />
-      </div>
-
-      {/* Auto-Detect Date & Quality Bar */}
-      <div className="mt-3 pt-2.5 border-t border-slate-200 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
-        
-        {/* Word count pill */}
-        <div className="flex items-center space-x-2">
-          <span
-            className={`inline-flex items-center space-x-1 rounded-md px-2 py-0.5 text-[11px] font-mono font-semibold border ${
-              wordCount >= 15
-                ? 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
-                : 'bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800'
-            }`}
-          >
-            <span>{wordCount} words</span>
-            <span>{wordCount >= 15 ? '· Ready' : '· Needs >15 words'}</span>
-          </span>
-        </div>
-
-        {/* Temporal Status Badge */}
-        <div>
-          {temporalInfo.temporalStatus === 'current' ? (
-            <span className="inline-flex items-center space-x-1 rounded-md border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-              <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-              <span>2025/2026 Cycle Detected</span>
-              {temporalInfo.detectedDate && (
-                <span className="font-mono opacity-80">({temporalInfo.detectedDate})</span>
-              )}
-            </span>
-          ) : temporalInfo.temporalStatus === 'outdated' ? (
-            <span className="inline-flex items-center space-x-1 rounded-md border border-purple-300 bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-800 dark:border-purple-800 dark:bg-purple-950/60 dark:text-purple-300">
-              <Clock className="h-3 w-3 text-purple-600 dark:text-purple-400" />
-              <span>Outdated Year Detected: {temporalInfo.detectedDate || '2023 or earlier'}</span>
-            </span>
-          ) : (
-            <span className="inline-flex items-center space-x-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
-              <AlertTriangle className="h-3 w-3 text-amber-600 dark:text-amber-400" />
-              <span>Undated Source — Will Flag Temporal Risk</span>
-            </span>
-          )}
-        </div>
-
       </div>
 
     </div>

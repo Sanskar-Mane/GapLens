@@ -2,8 +2,8 @@
  * GapLens Precomputed Analyses Registry & Dynamic Fallback Engine
  * Shinchan Online Hackathon 2026: Digital Dark Spot
  *
- * Provides pre-verified, deterministic analyses for the 3 hackathon scenarios
- * plus dynamic heuristic generation for arbitrary user questions in Offline Demo Mode.
+ * Provides pre-verified, deterministic analyses with traceable evidence quotes,
+ * epistemic rubric status classification, and dynamic fallback heuristics.
  */
 
 const PRECOMPUTED_ANALYSES = {
@@ -20,6 +20,38 @@ const PRECOMPUTED_ANALYSES = {
       'Current Submission Deadline',
       'Annual Renewal & Attendance Policy',
     ],
+    rubricStatus: [
+      {
+        parameter: 'Eligibility & Minimum Marks',
+        status: 'verified',
+        linkedIds: ['fact-1'],
+      },
+      {
+        parameter: 'Family Income Limit',
+        status: 'conflict',
+        linkedIds: ['conf-1'],
+      },
+      {
+        parameter: 'Required Documents List',
+        status: 'conflict',
+        linkedIds: ['conf-2', 'fact-2'],
+      },
+      {
+        parameter: 'Application Mode & Portal',
+        status: 'conflict',
+        linkedIds: ['conf-3', 'fact-1'],
+      },
+      {
+        parameter: 'Current Submission Deadline',
+        status: 'missing',
+        linkedIds: ['gap-2', 'time-1'],
+      },
+      {
+        parameter: 'Annual Renewal & Attendance Policy',
+        status: 'missing',
+        linkedIds: ['gap-1'],
+      },
+    ],
     sourcedFacts: [
       {
         id: 'fact-1',
@@ -29,6 +61,8 @@ const PRECOMPUTED_ANALYSES = {
         sourceIds: ['src-1'],
         sourceTitles: ['Official State Scholarship Portal Guidelines'],
         confidence: 'High (Official Source)',
+        evidenceQuote:
+          'Applicants must be domiciled in the state and have secured at least 75% marks in the previous qualifying examination.',
       },
       {
         id: 'fact-2',
@@ -38,6 +72,8 @@ const PRECOMPUTED_ANALYSES = {
         sourceIds: ['src-1'],
         sourceTitles: ['Official State Scholarship Portal Guidelines'],
         confidence: 'High (Official Source)',
+        evidenceQuote:
+          'Mandatory Documents: Aadhaar Card, Previous Year Marksheet, Bank Passbook copy (Aadhaar seeded), and Income Certificate issued by the competent Tehsildar office.',
       },
       {
         id: 'fact-3',
@@ -47,6 +83,8 @@ const PRECOMPUTED_ANALYSES = {
         sourceIds: ['src-2'],
         sourceTitles: ['EduCareer Student Guidance Blog'],
         confidence: 'Medium (Third-Party Guide)',
+        evidenceQuote:
+          'The State Post-Matric Scholarship covers undergraduate engineering and degree courses.',
       },
       {
         id: 'fact-4',
@@ -56,6 +94,8 @@ const PRECOMPUTED_ANALYSES = {
         sourceIds: ['src-4'],
         sourceTitles: ['Student Community Hostel Allowance FAQ'],
         confidence: 'Low (Unverified Community Post)',
+        evidenceQuote:
+          'Hostel students residing in recognized private hostels or paying guest accommodations receive an additional maintenance allowance of Rs. 1,200 per month',
       },
     ],
     informationGaps: [
@@ -100,11 +140,15 @@ const PRECOMPUTED_ANALYSES = {
           sourceId: 'src-1',
           title: 'Official State Scholarship Portal Guidelines',
           claim: 'Annual family income from all sources must not exceed Rs. 2,50,000.',
+          evidenceQuote:
+            'Annual family income from all combined sources must not exceed Rs. 2,50,000.',
         },
         sourceB: {
           sourceId: 'src-2',
           title: 'EduCareer Student Guidance Blog',
           claim: 'Students with a family income up to Rs. 8,00,000 per annum are eligible to apply.',
+          evidenceQuote:
+            'Students with an annual family income up to Rs. 8,00,000 per annum and minimum 60% marks in previous examinations are eligible to apply.',
         },
         resolutionAdvice:
           'Verify whether the Rs. 2.5 Lakh cap applies to specific categories while Rs. 8.0 Lakh applies to EBC/OBC tiers on the official portal.',
@@ -118,11 +162,15 @@ const PRECOMPUTED_ANALYSES = {
           sourceId: 'src-1',
           title: 'Official State Scholarship Portal Guidelines',
           claim: 'Requires an official Income Certificate issued by the Tehsildar.',
+          evidenceQuote:
+            'Income Certificate issued by the competent Tehsildar office.',
         },
         sourceB: {
           sourceId: 'src-2',
           title: 'EduCareer Student Guidance Blog',
           claim: 'States a self-attested income declaration on Rs. 100 stamp paper is sufficient.',
+          evidenceQuote:
+            'self-attested income declaration on a Rs. 100 stamp paper',
         },
         resolutionAdvice:
           'Do not rely on a stamp-paper affidavit; apply for a Tehsildar-issued digital income certificate.',
@@ -136,11 +184,15 @@ const PRECOMPUTED_ANALYSES = {
           sourceId: 'src-1',
           title: 'Official State Scholarship Portal Guidelines',
           claim: 'Requires 75% marks and strictly online portal submission.',
+          evidenceQuote:
+            'All applications must be submitted online via the official scholarship portal.',
         },
         sourceB: {
           sourceId: 'src-3',
           title: 'Regional Directorate Circular Archive',
           claim: 'Requires offline hard-copy submission to the District Nodal Officer.',
+          evidenceQuote:
+            'submit hard copies of their application form along with original verification slips to the District Nodal Officer on or before 15th November 2023.',
         },
         resolutionAdvice:
           'Source 3 is from the 2023-24 cycle; follow the online submission workflow in Source 1.',
@@ -155,6 +207,8 @@ const PRECOMPUTED_ANALYSES = {
         warningType: 'Outdated Cycle',
         riskDescription:
           'Refers to the 2023-24 academic cycle and offline submission procedures that have likely been superseded.',
+        evidenceQuote:
+          'All eligible scholarship candidates for the 2023-24 academic cycle must submit hard copies of their application form along with original verification slips to the District Nodal Officer on or before 15th November 2023.',
       },
       {
         id: 'time-2',
@@ -164,6 +218,8 @@ const PRECOMPUTED_ANALYSES = {
         warningType: 'Missing Publication Date',
         riskDescription:
           'Claims a Rs. 1,200/month hostel allowance without citing a notification date or official circular number.',
+        evidenceQuote:
+          'Hostel students residing in recognized private hostels or paying guest accommodations receive an additional maintenance allowance of Rs. 1,200 per month',
       },
     ],
     verificationChecklist: [
@@ -215,6 +271,38 @@ const PRECOMPUTED_ANALYSES = {
       'Shop & Establishment Act Registration',
       'Annual Renewal Window & Penalties',
     ],
+    rubricStatus: [
+      {
+        parameter: 'Turnover Threshold & FSSAI Category',
+        status: 'conflict',
+        linkedIds: ['conf-1', 'fact-1'],
+      },
+      {
+        parameter: 'Potable Water & Health Fitness Test',
+        status: 'verified',
+        linkedIds: ['fact-1'],
+      },
+      {
+        parameter: 'Municipal Health Trade License (PMC)',
+        status: 'verified',
+        linkedIds: ['fact-2'],
+      },
+      {
+        parameter: 'Fire Safety NOC & Commercial LPG Rules',
+        status: 'missing',
+        linkedIds: ['gap-1', 'conf-2', 'time-1'],
+      },
+      {
+        parameter: 'Shop & Establishment Act Registration',
+        status: 'missing',
+        linkedIds: ['gap-2'],
+      },
+      {
+        parameter: 'Annual Renewal Window & Penalties',
+        status: 'verified',
+        linkedIds: ['fact-3'],
+      },
+    ],
     sourcedFacts: [
       {
         id: 'fact-1',
@@ -224,6 +312,8 @@ const PRECOMPUTED_ANALYSES = {
         sourceIds: ['src-1'],
         sourceTitles: ['Food Safety Authority Portal (FSSAI Registration Standard)'],
         confidence: 'High (Official Source)',
+        evidenceQuote:
+          'Home-based food operators, tiffin providers, and cloud kitchens having an annual turnover of up to Rs. 12 Lakhs are required to obtain only a Basic FSSAI Registration Certificate (Form A).',
       },
       {
         id: 'fact-2',
@@ -233,6 +323,8 @@ const PRECOMPUTED_ANALYSES = {
         sourceIds: ['src-2'],
         sourceTitles: ['Municipal Corporation Trade Licensing Advisory (PMC)'],
         confidence: 'Medium (Municipal Advisory)',
+        evidenceQuote:
+          'Commercial food preparation and delivery establishments operating within Pune Municipal Corporation limits require a Municipal Health Trade License and commercial electricity meter.',
       },
       {
         id: 'fact-3',
@@ -242,6 +334,8 @@ const PRECOMPUTED_ANALYSES = {
         sourceIds: ['src-1'],
         sourceTitles: ['Food Safety Authority Portal (FSSAI Registration Standard)'],
         confidence: 'High (Official Source)',
+        evidenceQuote:
+          'Annual renewal must be applied 30 days prior to certificate expiry.',
       },
     ],
     informationGaps: [
@@ -286,11 +380,15 @@ const PRECOMPUTED_ANALYSES = {
           sourceId: 'src-1',
           title: 'Food Safety Authority Portal (FSSAI Registration Standard)',
           claim: 'Turnover up to Rs. 12 Lakhs requires Basic FSSAI Registration (Form A).',
+          evidenceQuote:
+            'annual turnover of up to Rs. 12 Lakhs are required to obtain only a Basic FSSAI Registration Certificate (Form A).',
         },
         sourceB: {
           sourceId: 'src-2',
           title: 'Municipal Corporation Trade Licensing Advisory (PMC)',
           claim: 'Turnover exceeding Rs. 20 Lakhs or connected load >5KW triggers State FSSAI License.',
+          evidenceQuote:
+            'turnover exceeding Rs. 20 Lakhs must obtain a State FSSAI License rather than Basic Registration.',
         },
         resolutionAdvice:
           'FSSAI national regulations strictly mandate State Licensing above Rs. 12 Lakhs per annum. Do not rely on the Rs. 20 Lakh figure on FoSCoS.',
@@ -304,11 +402,15 @@ const PRECOMPUTED_ANALYSES = {
           sourceId: 'src-2',
           title: 'Municipal Corporation Trade Licensing Advisory (PMC)',
           claim: 'Mandates commercial electricity meter and health trade compliance for all commercial food preparation.',
+          evidenceQuote:
+            'require a Municipal Health Trade License and commercial electricity meter.',
         },
         sourceB: {
           sourceId: 'src-3',
           title: 'Archived Restaurant & Cloud Kitchen Fee Schedule',
           claim: 'Fire department NOC and pollution clearance are exempt for domestic LPG cylinder users under 20 orders/day.',
+          evidenceQuote:
+            'Fire department NOC and effluent pollution clearance are exempt for domestic LPG cylinder users operating below 20 orders per day.',
         },
         resolutionAdvice:
           'Source 3 is an archived 2021 circular; domestic LPG exemptions have been superseded by current commercial fire bylaws.',
@@ -323,6 +425,8 @@ const PRECOMPUTED_ANALYSES = {
         warningType: 'Outdated Circular',
         riskDescription:
           'Refers to a 2021 municipal fee schedule and obsolete fire exemptions that no longer reflect 2026 safety standards.',
+        evidenceQuote:
+          'Under the 2021 Municipal Schedule, small food establishments pay a flat inspection fee of Rs. 1,500.',
       },
     ],
     verificationChecklist: [
@@ -374,6 +478,38 @@ const PRECOMPUTED_ANALYSES = {
       'Mandatory Income Proof & Tehsildar Document',
       'Annual Progress Report & Bank Renewal Procedure',
     ],
+    rubricStatus: [
+      {
+        parameter: 'Parental Income Ceiling',
+        status: 'conflict',
+        linkedIds: ['conf-1'],
+      },
+      {
+        parameter: 'Approved Foreign University & Degree Types',
+        status: 'verified',
+        linkedIds: ['fact-2'],
+      },
+      {
+        parameter: 'Eligible Study Modes (Full-Time vs Hybrid/Online)',
+        status: 'missing',
+        linkedIds: ['gap-1'],
+      },
+      {
+        parameter: 'Moratorium Period & Subsidy Disbursal',
+        status: 'verified',
+        linkedIds: ['fact-1'],
+      },
+      {
+        parameter: 'Mandatory Income Proof & Tehsildar Document',
+        status: 'conflict',
+        linkedIds: ['conf-2'],
+      },
+      {
+        parameter: 'Annual Progress Report & Bank Renewal Procedure',
+        status: 'verified',
+        linkedIds: ['fact-3', 'gap-3', 'time-1'],
+      },
+    ],
     sourcedFacts: [
       {
         id: 'fact-1',
@@ -383,6 +519,8 @@ const PRECOMPUTED_ANALYSES = {
         sourceIds: ['src-1'],
         sourceTitles: ['Ministry of Education Scheme Portal (CSIS Overseas Guidelines)'],
         confidence: 'High (Official Source)',
+        evidenceQuote:
+          'full interest subsidy is provided during the moratorium period (course duration plus 1 year) on educational loans availed from scheduled banks.',
       },
       {
         id: 'fact-2',
@@ -392,6 +530,8 @@ const PRECOMPUTED_ANALYSES = {
         sourceIds: ['src-1'],
         sourceTitles: ['Ministry of Education Scheme Portal (CSIS Overseas Guidelines)'],
         confidence: 'High (Official Source)',
+        evidenceQuote:
+          'Applicable only for full-time Master’s and Ph.D. programs in approved foreign universities.',
       },
       {
         id: 'fact-3',
@@ -401,6 +541,8 @@ const PRECOMPUTED_ANALYSES = {
         sourceIds: ['src-3'],
         sourceTitles: ['Nationalized Bank Education Loan Customer Brochure'],
         confidence: 'Medium (Bank Brochure)',
+        evidenceQuote:
+          'Borrowers must submit annual academic progress reports and income renewal certificates to their home branch.',
       },
     ],
     informationGaps: [
@@ -445,11 +587,15 @@ const PRECOMPUTED_ANALYSES = {
           sourceId: 'src-1',
           title: 'Ministry of Education Scheme Portal (CSIS Overseas Guidelines)',
           claim: 'Annual gross parental income from all sources must not exceed Rs. 4,50,000 per annum.',
+          evidenceQuote:
+            'Annual gross parental income from all sources must not exceed Rs. 4,50,000 per annum.',
         },
         sourceB: {
           sourceId: 'src-2',
           title: 'Global Education Finance Advisory Blog',
           claim: 'Students can claim government interest subsidy if family income is up to Rs. 6,00,000 per annum.',
+          evidenceQuote:
+            'Students admitted to STEM and business management master’s programs abroad can claim the government interest subsidy if family income is up to Rs. 6,00,000 per annum.',
         },
         resolutionAdvice:
           'CSIS central guidelines strictly enforce the Rs. 4.50 Lakh EBC cap. The Rs. 6 Lakh figure likely refers to a state-level minority subsidy.',
@@ -463,11 +609,15 @@ const PRECOMPUTED_ANALYSES = {
           sourceId: 'src-1',
           title: 'Ministry of Education Scheme Portal (CSIS Overseas Guidelines)',
           claim: 'Requires an official Income Certificate issued by competent revenue authority.',
+          evidenceQuote:
+            'Under the Central Scheme to Provide Interest Subsidy (CSIS) for Overseas Studies',
         },
         sourceB: {
           sourceId: 'src-2',
           title: 'Global Education Finance Advisory Blog',
           claim: 'Self-declared income affidavit and admission offer letter are sufficient.',
+          evidenceQuote:
+            'A self-declared income affidavit and admission offer letter from any accredited foreign institute are sufficient to initiate subsidy disbursement with partner banks.',
         },
         resolutionAdvice:
           'Nationalized banks reject self-declarations; an income certificate issued by a Sub-Divisional Magistrate or Tehsildar is mandatory.',
@@ -482,6 +632,8 @@ const PRECOMPUTED_ANALYSES = {
         warningType: 'Missing Publication Date',
         riskDescription:
           'Brochure contains no publication date or circular number, leaving annual progress submission windows unverifiable.',
+        evidenceQuote:
+          'The brochure does not state whether part-time or executive online master’s programs qualify for the interest subsidy.',
       },
     ],
     verificationChecklist: [
@@ -538,6 +690,9 @@ function generateDynamicFallbackAnalysis(topic, category = 'General', sources = 
     const pub = (s.publishedDate || '').trim();
     const content = s.content || '';
 
+    const firstSnippet =
+      content.length > 30 ? content.slice(0, 140) : `Content excerpt from ${title}`;
+
     if (!pub) {
       outdatedWarnings.push({
         id: `time-${outdatedWarnings.length + 1}`,
@@ -546,6 +701,7 @@ function generateDynamicFallbackAnalysis(topic, category = 'General', sources = 
         detectedDate: 'Undated',
         warningType: 'Missing Publication Date',
         riskDescription: `Source "${title}" does not specify a publication date, making validity under current 2026 regulations uncertain.`,
+        evidenceQuote: firstSnippet,
       });
     } else {
       const yearMatch = pub.match(/\b(201\d|202[0-4])\b/);
@@ -557,6 +713,7 @@ function generateDynamicFallbackAnalysis(topic, category = 'General', sources = 
           detectedDate: pub,
           warningType: 'Potentially Outdated Cycle',
           riskDescription: `Dated ${pub} (prior to 2025). Regulatory terms, fee schedules, or filing portals may have evolved.`,
+          evidenceQuote: firstSnippet,
         });
       }
     }
@@ -624,7 +781,7 @@ function generateDynamicFallbackAnalysis(topic, category = 'General', sources = 
     const sentences = s.content
       .split(/[.!?]\s+/)
       .map((t) => t.trim())
-      .filter((t) => t.length > 25);
+      .filter((t) => t.length > 20);
 
     const factSentence =
       sentences[0] || `Source provides guidance regarding ${cleanTopic.slice(0, 60)}.`;
@@ -635,7 +792,11 @@ function generateDynamicFallbackAnalysis(topic, category = 'General', sources = 
       statement: factSentence.slice(0, 180),
       sourceIds: [sId],
       sourceTitles: [title],
-      confidence: s.sourceType === 'Official Notice' ? 'High (Official Source)' : 'Medium (Extracted Fact)',
+      confidence:
+        s.sourceType === 'Official Notice'
+          ? 'High (Official Source)'
+          : 'Medium (Extracted Fact)',
+      evidenceQuote: factSentence.slice(0, 160),
     });
   });
 
@@ -672,6 +833,9 @@ function generateDynamicFallbackAnalysis(topic, category = 'General', sources = 
   if (validSources.length >= 2) {
     const sA = validSources[0];
     const sB = validSources[1];
+    const quoteA = sA.content.slice(0, 110);
+    const quoteB = sB.content.slice(0, 110);
+
     contradictions.push({
       id: 'conf-1',
       parameter: 'Prerequisite Threshold & Compliance Standard',
@@ -680,12 +844,14 @@ function generateDynamicFallbackAnalysis(topic, category = 'General', sources = 
       sourceA: {
         sourceId: sA.id || 'src-1',
         title: sA.title || 'Source 1',
-        claim: sA.content.slice(0, 120) + '...',
+        claim: quoteA + '...',
+        evidenceQuote: quoteA,
       },
       sourceB: {
         sourceId: sB.id || 'src-2',
         title: sB.title || 'Source 2',
-        claim: sB.content.slice(0, 120) + '...',
+        claim: quoteB + '...',
+        evidenceQuote: quoteB,
       },
       resolutionAdvice:
         'Compare the official government portal circular against secondary third-party guidance to establish legal precedence.',
@@ -707,7 +873,30 @@ function generateDynamicFallbackAnalysis(topic, category = 'General', sources = 
     readinessLabel = 'Fair Readiness — Minor Verification Gaps Detected';
   }
 
-  // 7. Build prioritized verification checklist
+  // 7. Synthesize Decision Completeness Rubric Status
+  const rubricStatus = expectedRubric.map((param, i) => {
+    if (i === 0 || i === 1) {
+      return {
+        parameter: param,
+        status: 'verified',
+        linkedIds: sourcedFacts[i] ? [sourcedFacts[i].id] : ['fact-1'],
+      };
+    }
+    if (i === 2 && contradictions.length > 0) {
+      return {
+        parameter: param,
+        status: 'conflict',
+        linkedIds: ['conf-1'],
+      };
+    }
+    return {
+      parameter: param,
+      status: 'missing',
+      linkedIds: [`gap-${Math.min(i - 2, informationGaps.length)}`],
+    };
+  });
+
+  // 8. Build prioritized verification checklist
   const verificationChecklist = [
     {
       id: 'chk-1',
@@ -746,6 +935,7 @@ function generateDynamicFallbackAnalysis(topic, category = 'General', sources = 
     readinessLabel,
     executiveSummary,
     expectedRubric,
+    rubricStatus,
     sourcedFacts,
     informationGaps,
     contradictions,
@@ -758,4 +948,3 @@ module.exports = {
   PRECOMPUTED_ANALYSES,
   generateDynamicFallbackAnalysis,
 };
-

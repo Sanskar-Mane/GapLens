@@ -1,84 +1,131 @@
 /**
- * OpenRouter AI Configuration & Free Tier Model Registry
+ * Google Gemini AI Configuration & Dynamic .env Model Registry
  * Shinchan Online Hackathon 2026: Digital Dark Spot
+ *
+ * Models are strictly fetched and parsed from process.env.GEMINI_MODEL
+ * (or process.env.OPENROUTER_MODEL for backwards compatibility).
+ * No extra models are appended; no hardcoded models overwrite .env values.
  */
 
-const FREE_MODELS = [
-  {
-    id: 'meta-llama/llama-3.3-70b-instruct:free',
-    name: 'Llama 3.3 70B Instruct',
-    provider: 'Meta',
-    badge: 'Primary Recommended',
-    description: 'Fast, high-fidelity reasoning & reliable structured JSON extraction (Zero Cost).',
-    contextWindow: '128k',
-  },
-  {
-    id: 'google/gemma-3-27b-it:free',
-    name: 'Gemma 3 27B IT',
-    provider: 'Google',
-    badge: 'Free Tier',
-    description: 'Google multimodal reasoning model optimized for policy comparison.',
-    contextWindow: '128k',
-  },
-  {
-    id: 'mistralai/mistral-small-3.1-24b-instruct:free',
-    name: 'Mistral Small 3.1 24B',
-    provider: 'Mistral AI',
-    badge: 'Free Tier',
-    description: 'Concise and precise contradiction spotting across circulars.',
-    contextWindow: '32k',
-  },
-  {
-    id: 'nvidia/llama-3.3-nemotron-super-49b-v1:free',
-    name: 'Nemotron Super 49B',
-    provider: 'NVIDIA',
-    badge: 'Free Tier',
-    description: 'NVIDIA high-performance reasoning tuned for compliance and dark spots.',
-    contextWindow: '128k',
-  },
-  {
-    id: 'deepseek/deepseek-r1:free',
-    name: 'DeepSeek R1',
-    provider: 'DeepSeek',
-    badge: 'Free Tier Reasoning',
-    description: 'Deep mathematical and logical verification with chain-of-thought.',
-    contextWindow: '64k',
-  },
-  {
-    id: 'qwen/qwen3-235b-a22b:free',
-    name: 'Qwen 3 235B',
-    provider: 'Alibaba',
-    badge: 'Free Tier',
-    description: 'Massive MoE open weights model for complex document auditing.',
-    contextWindow: '128k',
-  },
-  {
-    id: 'openrouter/auto',
-    name: 'OpenRouter Auto Router',
-    provider: 'OpenRouter',
-    badge: 'Auto Smart Router',
-    description: 'Dynamically routes to the best available free/low-cost model with lowest latency.',
-    contextWindow: 'Auto',
-  },
-];
+const path = require('path');
+const dotenv = require('dotenv');
 
-const DEFAULT_MODEL = 'meta-llama/llama-3.3-70b-instruct:free';
+// Guarantee .env is loaded from the backend directory
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
+
+const VERIFIED_FREE_MODELS = [];
 
 /**
- * Build standard headers for OpenRouter API requests
+ * Sanitize raw model string by stripping prefixes/suffixes while preserving the slug
+ * @param {string} rawModel
+ * @returns {string} Sanitized model slug
+ */
+function sanitizeModelSlug(rawModel) {
+  if (!rawModel || typeof rawModel !== 'string' || !rawModel.trim()) {
+    return '';
+  }
+
+  let cleaned = rawModel.trim();
+
+  // Strip leading 'google/' or 'models/' prefix
+  if (cleaned.startsWith('google/')) {
+    cleaned = cleaned.slice('google/'.length);
+  } else if (cleaned.startsWith('models/')) {
+    cleaned = cleaned.slice('models/'.length);
+  }
+
+  // Strip trailing ':free' suffix
+  if (cleaned.endsWith(':free')) {
+    cleaned = cleaned.slice(0, -':free'.length);
+  }
+
+  return cleaned.trim();
+}
+
+/**
+ * Parse models strictly from process.env.GEMINI_MODEL || process.env.OPENROUTER_MODEL
+ * @returns {string[]} Array of unique sanitized model slugs from .env
+ */
+function getModelsFromEnv() {
+  const envModelStr = process.env.GEMINI_MODEL || process.env.OPENROUTER_MODEL || '';
+  const parsed = envModelStr
+    .split(',')
+    .map((m) => sanitizeModelSlug(m))
+    .filter(Boolean);
+
+  const modelList = [];
+  for (const m of parsed) {
+    if (!modelList.includes(m)) {
+      modelList.push(m);
+    }
+  }
+
+  return modelList;
+}
+
+/**
+ * Format a raw model slug into a display metadata object
+ * @param {string} modelId
+ * @param {number} index
+ * @returns {object}
+ */
+function formatModelMetadata(modelId, index) {
+  // Format modelId into title case (e.g. 'gemini-2.5-flash' -> 'Gemini 2.5 Flash')
+  const name = modelId
+    .split(/[-_]/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+
+  return {
+    id: modelId,
+    name,
+    provider: 'Google Gemini',
+    badge: index === 0 ? 'Primary (.env)' : 'Configured (.env)',
+    description: `Configured in backend .env (${modelId})`,
+    contextWindow: 'Auto',
+  };
+}
+
+/**
+ * Returns rich model objects strictly for all models configured in .env
+ * @returns {Array<object>}
+ */
+function getAvailableModels() {
+  const modelIds = getModelsFromEnv();
+  return modelIds.map((id, index) => formatModelMetadata(id, index));
+}
+
+/**
+ * Returns the primary (first) model configured in .env
+ * @returns {string}
+ */
+function getDefaultModel() {
+  const modelIds = getModelsFromEnv();
+  return modelIds[0] || '';
+}
+
+/**
+ * Build standard headers for Google Gemini REST API requests
  */
 function getOpenRouterHeaders(apiKey) {
   return {
-    Authorization: `Bearer ${apiKey}`,
     'Content-Type': 'application/json',
-    'HTTP-Referer': 'https://gaplens.local',
-    'X-Title': 'GapLens - AI Information Gap Detection',
+    'x-goog-api-key': apiKey || '',
   };
 }
 
 module.exports = {
-  FREE_MODELS,
-  DEFAULT_MODEL,
+  VERIFIED_FREE_MODELS,
+  sanitizeModelSlug,
+  getModelsFromEnv,
+  getAvailableModels,
+  getDefaultModel,
+  formatModelMetadata,
+  get FREE_MODELS() {
+    return getAvailableModels();
+  },
+  get DEFAULT_MODEL() {
+    return getDefaultModel();
+  },
   getOpenRouterHeaders,
 };
-

@@ -1,5 +1,13 @@
+const https = require('https');
 const axios = require('axios');
 const cheerio = require('cheerio');
+
+// Dedicated IPv4 HTTPS Agent to avoid Windows IPv6 resolution hang and ETIMEDOUT
+const ipv4HttpsAgent = new https.Agent({
+  family: 4,
+  keepAlive: true,
+  timeout: 15000,
+});
 
 /**
  * Cloudflare & Bot Wall Detector
@@ -139,11 +147,12 @@ async function extractUrlContent(url) {
     };
   }
 
-  // 1. Primary Method: Jina AI Reader
+  // 1. Primary Method: Jina AI Reader (fast 7s timeout with IPv4 agent)
   try {
     const jinaEndpoint = `https://r.jina.ai/${encodeURIComponent(cleanUrl)}`;
     const jinaRes = await axios.get(jinaEndpoint, {
-      timeout: 15000,
+      timeout: 7000,
+      httpsAgent: ipv4HttpsAgent,
       headers: {
         Accept: 'application/json, text/plain, text/markdown',
         'X-Retain-Images': 'none',
@@ -189,10 +198,11 @@ async function extractUrlContent(url) {
     console.warn(`[Scraper Warning] Jina AI extraction fallback for ${cleanUrl}: ${jinaErr.message}`);
   }
 
-  // 2. Fallback Method: Direct Axios Fetch + Cheerio
+  // 2. Fallback Method: Direct Axios Fetch + Cheerio (fast 7s timeout with IPv4 agent)
   try {
     const directRes = await axios.get(cleanUrl, {
-      timeout: 12000,
+      timeout: 7000,
+      httpsAgent: ipv4HttpsAgent,
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -275,11 +285,12 @@ async function searchPermittedSources(query) {
   const cleanQuery = query.trim();
   const results = [];
 
-  // 1. Try Jina AI Search API
+  // 1. Try Jina AI Search API (7s timeout with IPv4 agent)
   try {
     const jinaSearchUrl = `https://s.jina.ai/${encodeURIComponent(cleanQuery)}`;
     const jinaRes = await axios.get(jinaSearchUrl, {
-      timeout: 9000,
+      timeout: 7000,
+      httpsAgent: ipv4HttpsAgent,
       headers: {
         Accept: 'application/json',
         'X-Respond-With': 'no-content',
@@ -313,7 +324,10 @@ async function searchPermittedSources(query) {
       const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
         cleanQuery
       )}&utf8=&format=json`;
-      const wikiRes = await axios.get(wikiUrl, { timeout: 6000 });
+      const wikiRes = await axios.get(wikiUrl, {
+        timeout: 6000,
+        httpsAgent: ipv4HttpsAgent,
+      });
 
       if (wikiRes.data && wikiRes.data.query && Array.isArray(wikiRes.data.query.search)) {
         wikiRes.data.query.search.slice(0, 3).forEach((item) => {
