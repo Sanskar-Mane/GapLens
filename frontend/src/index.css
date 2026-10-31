@@ -3,8 +3,21 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    font-size: 18px; /* Scales standard rem-based Tailwind tokens across all components */
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow-x: hidden;
+  }
+
+  #root {
+    zoom: 1.2; /* Crisp Chromium/WebKit/Blink zoom factor providing the exact 150% spacious dashboard feel at default 100% zoom */
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
   }
 }
 

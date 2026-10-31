@@ -16,9 +16,26 @@ const apiClient = axios.create({
   },
 });
 
-// Interceptor to inject client-side Gemini & OpenRouter key & model headers
+// Interceptor to inject client-side Gemini & OpenRouter key, model, and auth headers
 apiClient.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
+    const authToken = localStorage.getItem('gaplens_auth_token');
+    if (authToken && authToken.trim()) {
+      config.headers['Authorization'] = `Bearer ${authToken.trim()}`;
+    }
+
+    const storedUser = localStorage.getItem('gaplens_user');
+    if (storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        if (parsed?.id) {
+          config.headers['x-user-id'] = parsed.id;
+        }
+      } catch (e) {
+        // Ignore JSON parse error
+      }
+    }
+
     const clientKey =
       localStorage.getItem('gaplens_gemini_key') ||
       localStorage.getItem('gaplens_openrouter_key') ||
@@ -44,6 +61,70 @@ apiClient.interceptors.request.use((config) => {
   }
   return config;
 });
+
+/**
+ * Register a new user
+ */
+export const apiSignup = async (email, password) => {
+  try {
+    const res = await apiClient.post('/auth/signup', { email, password });
+    return res.data;
+  } catch (err) {
+    const serverMsg =
+      err.response?.data?.msg ||
+      err.response?.data?.message ||
+      err.response?.data?.error_description ||
+      err.response?.data?.error;
+    const errorToThrow = new Error(serverMsg || err.message || 'Registration failed');
+    errorToThrow.status = err.response?.status;
+    errorToThrow.response = err.response;
+    throw errorToThrow;
+  }
+};
+
+/**
+ * Log in an existing user
+ */
+export const apiLogin = async (email, password) => {
+  try {
+    const res = await apiClient.post('/auth/login', { email, password });
+    return res.data;
+  } catch (err) {
+    const serverMsg =
+      err.response?.data?.msg ||
+      err.response?.data?.message ||
+      err.response?.data?.error_description ||
+      err.response?.data?.error;
+    const errorToThrow = new Error(serverMsg || err.message || 'Login failed');
+    errorToThrow.status = err.response?.status;
+    errorToThrow.response = err.response;
+    throw errorToThrow;
+  }
+};
+
+/**
+ * Log out user session
+ */
+export const apiLogout = async () => {
+  try {
+    const res = await apiClient.post('/auth/logout');
+    return res.data;
+  } catch (err) {
+    return { success: true };
+  }
+};
+
+/**
+ * Fetch profile of current authenticated user
+ */
+export const apiGetMe = async () => {
+  try {
+    const res = await apiClient.get('/auth/me');
+    return res.data;
+  } catch (err) {
+    return { success: false, user: null };
+  }
+};
 
 /**
  * Fetch backend system health, Supabase connectivity status, and OpenRouter config
@@ -216,19 +297,35 @@ export const scanTextMetadata = async (content, publishedDate = '') => {
  */
 export const saveResearchSession = async (sessionData) => {
   try {
+    let resolvedUserId = sessionData.user_id || sessionData.userId || null;
+    if (!resolvedUserId && typeof window !== 'undefined') {
+      try {
+        const storedUser = localStorage.getItem('gaplens_user');
+        if (storedUser) {
+          resolvedUserId = JSON.parse(storedUser)?.id || null;
+        }
+      } catch {}
+    }
+
     const payload = {
       topic: sessionData.topic,
       category: sessionData.category,
       sources: sessionData.sources,
       model_used: sessionData.modelUsed || sessionData.model_used || DEFAULT_FREE_MODEL,
       analysis_result: sessionData.analysisResult || sessionData.analysis_result,
+      user_id: resolvedUserId,
     };
     const res = await apiClient.post('/sessions', payload);
     return res.data;
   } catch (err) {
     console.warn('[GapLens API] Backend session save error, caching locally in localStorage');
     const localId = `local-${Date.now()}`;
-    const localRecord = { ...sessionData, id: localId, savedLocally: true };
+    const localRecord = {
+      ...sessionData,
+      id: localId,
+      user_id: sessionData.user_id || sessionData.userId || null,
+      savedLocally: true,
+    };
     const history = JSON.parse(localStorage.getItem('gaplens_local_sessions') || '[]');
     history.unshift(localRecord);
     localStorage.setItem('gaplens_local_sessions', JSON.stringify(history.slice(0, 20)));
@@ -445,6 +542,11 @@ export function generateClientDynamicFallback(topic, category = 'General', sourc
         evidenceQuote: quoteB,
       },
       resolutionAdvice: 'Cross-examine primary government gazettes against secondary portal summaries to establish authoritative precedence.',
+      precedenceVerdict: {
+        bindingSourceId: sA.id || 'src-1',
+        confidence: 'Strong Suggestion',
+        legalWeightReasoning: `${sA.title || 'Source 1'} reflects primary regulatory/official documentation and supersedes secondary third-party interpretation under standard hierarchy of authority.`,
+      },
     });
   }
 
@@ -520,6 +622,26 @@ export function generateClientDynamicFallback(topic, category = 'General', sourc
 
   const executiveSummary = `Dynamic audit of ${srcCount} source(s) regarding "${cleanTopic}" identifies key corroborated statements alongside ${informationGaps.length} critical information gaps (${expectedRubric[4] || 'Renewal'}, ${expectedRubric[3] || 'Deadlines'}). ${contradictions.length > 0 ? `A potential divergence exists between Source 1 and Source 2 regarding prerequisite compliance. ` : ''}${outdatedWarnings.length > 0 ? `${outdatedWarnings.length} source(s) carry temporal uncertainty. ` : ''}Verification with designated authorities is recommended before committing.`;
 
+  const decisionPreMortem = {
+    overallRiskLevel: score < 50 ? 'Severe Risk' : score < 70 ? 'High Risk' : 'Moderate Risk',
+    estimatedDelay: '30 to 60 Days Administrative Processing Delay',
+    consequenceSummary: `Proceeding under unresolved contradictory criteria risks immediate statutory disqualification or audit rejection. Missing verification of "${expectedRubric[4] || 'prerequisites'}" and "${expectedRubric[3] || 'timelines'}" creates actionable compliance vulnerabilities.`,
+    criticalFailurePoints: [
+      {
+        darkSpotRef: contradictions[0]?.id || 'conf-1',
+        failureScenario: `Statutory challenge or rejection caused by divergence between conflicting source claims regarding ${cleanTopic.slice(0, 40)}.`,
+        penaltyOrLoss:
+          'Administrative rejection, loss of application processing fees, or required resubmission.',
+      },
+      {
+        darkSpotRef: informationGaps[0]?.id || 'gap-1',
+        failureScenario: `Non-compliance with undisclosed mandatory prerequisite: "${expectedRubric[4] || 'prerequisites'}".`,
+        penaltyOrLoss:
+          'Indefinite lodgment hold or retroactive disqualification upon nodal verification.',
+      },
+    ],
+  };
+
   return {
     readinessScore: score,
     readinessLabel,
@@ -531,6 +653,7 @@ export function generateClientDynamicFallback(topic, category = 'General', sourc
     contradictions,
     outdatedWarnings,
     verificationChecklist,
+    decisionPreMortem,
   };
 }
 
@@ -657,10 +780,22 @@ export const probeGemini = probeOpenRouter;
 
 /**
  * Fetch saved research sessions from backend Supabase or localStorage fallback
+ * Strictly scoped to the authenticated user ID
  */
-export const fetchSavedSessions = async () => {
+export const fetchSavedSessions = async (userId = null) => {
   try {
-    const res = await apiClient.get('/sessions', { timeout: 5000 });
+    let activeUserId = userId;
+    if (!activeUserId && typeof window !== 'undefined') {
+      try {
+        const storedUser = localStorage.getItem('gaplens_user');
+        if (storedUser) {
+          activeUserId = JSON.parse(storedUser)?.id || null;
+        }
+      } catch {}
+    }
+
+    const params = activeUserId ? { user_id: activeUserId } : {};
+    const res = await apiClient.get('/sessions', { params, timeout: 5000 });
     if (res.data && Array.isArray(res.data.sessions)) {
       return {
         success: true,
@@ -672,13 +807,28 @@ export const fetchSavedSessions = async () => {
     console.warn('[GapLens API] /api/sessions unavailable, checking localStorage:', err.message);
   }
 
-  // Fallback to local storage
+  // Fallback to local storage (strictly filtered by user ID)
   try {
+    let activeUserId = userId;
+    if (!activeUserId && typeof window !== 'undefined') {
+      try {
+        const storedUser = localStorage.getItem('gaplens_user');
+        if (storedUser) {
+          activeUserId = JSON.parse(storedUser)?.id || null;
+        }
+      } catch {}
+    }
+
+    if (!activeUserId) {
+      return { success: true, storage: 'empty', sessions: [] };
+    }
+
     const local = JSON.parse(localStorage.getItem('gaplens_local_sessions') || '[]');
+    const filtered = local.filter((s) => s.user_id === activeUserId);
     return {
       success: true,
       storage: 'localStorage',
-      sessions: local,
+      sessions: filtered,
     };
   } catch {
     return { success: true, storage: 'empty', sessions: [] };
@@ -688,14 +838,26 @@ export const fetchSavedSessions = async () => {
 /**
  * Persist interactive checklist progress and verification notes
  */
-export const patchSessionChecklist = async (sessionId, { checkedIds = [], verificationNotes = {} }) => {
+export const patchSessionChecklist = async (sessionId, { checkedIds = [], verificationNotes = {}, userId = null }) => {
   if (!sessionId) return { success: false, message: 'No sessionId provided' };
 
   try {
+    let activeUserId = userId;
+    if (!activeUserId && typeof window !== 'undefined') {
+      try {
+        const storedUser = localStorage.getItem('gaplens_user');
+        if (storedUser) {
+          activeUserId = JSON.parse(storedUser)?.id || null;
+        }
+      } catch {}
+    }
+
+    const params = activeUserId ? { user_id: activeUserId } : {};
     const res = await apiClient.patch(`/sessions/${sessionId}/checklist`, {
       checkedIds,
       verificationNotes,
-    });
+      user_id: activeUserId,
+    }, { params });
     return res.data;
   } catch (err) {
     console.warn('[GapLens API] Patch session error, caching in localStorage:', err.message);
@@ -725,11 +887,22 @@ export const patchSessionChecklist = async (sessionId, { checkedIds = [], verifi
 /**
  * Delete a saved research session
  */
-export const deleteSavedSession = async (sessionId) => {
+export const deleteSavedSession = async (sessionId, userId = null) => {
   if (!sessionId) return { success: false };
 
   try {
-    const res = await apiClient.delete(`/sessions/${sessionId}`);
+    let activeUserId = userId;
+    if (!activeUserId && typeof window !== 'undefined') {
+      try {
+        const storedUser = localStorage.getItem('gaplens_user');
+        if (storedUser) {
+          activeUserId = JSON.parse(storedUser)?.id || null;
+        }
+      } catch {}
+    }
+
+    const params = activeUserId ? { user_id: activeUserId } : {};
+    const res = await apiClient.delete(`/sessions/${sessionId}`, { params });
     return res.data;
   } catch (err) {
     console.warn('[GapLens API] Delete session backend error, removing locally:', err.message);

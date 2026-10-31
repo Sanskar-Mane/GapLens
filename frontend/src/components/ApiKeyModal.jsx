@@ -111,7 +111,7 @@ export default function ApiKeyModal({
       />
 
       <div className="relative w-full max-w-xl rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-2xl transition-all dark:border-zinc-800 dark:bg-zinc-900 z-10 space-y-5">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-100 pb-3 dark:border-zinc-800">
           <div className="flex items-center space-x-2.5">
@@ -149,14 +149,12 @@ export default function ApiKeyModal({
           <button
             type="button"
             onClick={() => onToggleForceDemo && onToggleForceDemo(!forceOfflineDemo)}
-            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
-              forceOfflineDemo ? 'bg-zinc-900 dark:bg-zinc-100' : 'bg-zinc-300 dark:bg-zinc-700'
-            }`}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${forceOfflineDemo ? 'bg-zinc-900 dark:bg-zinc-100' : 'bg-zinc-300 dark:bg-zinc-700'
+              }`}
           >
             <span
-              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white dark:bg-zinc-900 shadow-sm transition duration-200 ease-in-out ${
-                forceOfflineDemo ? 'translate-x-5' : 'translate-x-0'
-              }`}
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white dark:bg-zinc-900 shadow-sm transition duration-200 ease-in-out ${forceOfflineDemo ? 'translate-x-5' : 'translate-x-0'
+                }`}
             />
           </button>
         </div>
@@ -171,7 +169,7 @@ export default function ApiKeyModal({
               type={showKey ? 'text' : 'password'}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder={backendHasKey ? 'Server Gemini key configured via .env' : 'AIzaSy...'}
+              placeholder={backendHasKey ? 'Server key configured via .env' : 'AIzaSy...'}
               className="w-full rounded-xl border border-zinc-200/80 bg-zinc-50 py-2.5 pl-3 pr-20 text-xs font-mono text-zinc-900 focus:border-zinc-900 focus:bg-white focus:outline-hidden dark:border-zinc-700 dark:bg-zinc-850 dark:text-zinc-100"
             />
             <div className="absolute inset-y-0 right-2 flex items-center space-x-1">
@@ -203,7 +201,7 @@ export default function ApiKeyModal({
           </label>
           {availableModels.length === 0 ? (
             <div className="rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-center text-xs text-zinc-500">
-              No models found in backend .env (configure GEMINI_MODEL in backend/.env)
+              No models configured in backend .env. Please set GEMINI_MODEL in backend/.env
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-1">
@@ -214,28 +212,25 @@ export default function ApiKeyModal({
                     key={m.id}
                     type="button"
                     onClick={() => setSelectedModel(m.id)}
-                    className={`rounded-xl border p-3 text-left transition-all ${
-                      isSelected
+                    className={`rounded-xl border p-3 text-left transition-all ${isSelected
                         ? 'border-zinc-900 bg-zinc-900 text-white dark:border-white dark:bg-white dark:text-zinc-900 shadow-sm'
                         : 'border-zinc-200/80 bg-zinc-50 text-zinc-700 hover:bg-white dark:border-zinc-800 dark:bg-zinc-850 dark:text-zinc-300 dark:hover:bg-zinc-800'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold truncate">{m.name}</span>
                       <span
-                        className={`rounded-full px-2 py-0.2 text-[9px] font-semibold ${
-                          isSelected
+                        className={`rounded-full px-2 py-0.2 text-[9px] font-semibold ${isSelected
                             ? 'bg-zinc-800 text-zinc-200 dark:bg-zinc-200 dark:text-zinc-800'
                             : 'bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300'
-                        }`}
+                          }`}
                       >
                         {m.badge || 'Configured'}
                       </span>
                     </div>
                     <p
-                      className={`mt-1 text-[11px] line-clamp-1 ${
-                        isSelected ? 'text-zinc-300 dark:text-zinc-600' : 'text-zinc-400'
-                      }`}
+                      className={`mt-1 text-[11px] line-clamp-1 ${isSelected ? 'text-zinc-300 dark:text-zinc-600' : 'text-zinc-400'
+                        }`}
                     >
                       {m.description}
                     </p>
@@ -249,14 +244,13 @@ export default function ApiKeyModal({
         {/* Test Result Message */}
         {testResult && (
           <div
-            className={`rounded-xl p-2.5 text-xs flex items-center space-x-2 border ${
-              testResult.success
+            className={`rounded-xl p-2.5 text-xs flex items-center space-x-2 border ${testResult.success
                 ? 'bg-zinc-50 text-emerald-600 border-zinc-200/60 dark:bg-zinc-850 dark:border-zinc-800'
                 : 'bg-zinc-50 text-rose-600 border-zinc-200/60 dark:bg-zinc-850 dark:border-zinc-800'
-            }`}
+              }`}
           >
             {testResult.success ? <Check className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-            <span>{testResult.message}</span>
+            <span>{testResult.message || testResult.reply}</span>
           </div>
         )}
 

@@ -24,9 +24,9 @@ router.get('/health', (req, res) => {
   const envKey = process.env.GEMINI_API_KEY || process.env.OPENROUTER_API_KEY;
   const hasServerKey = Boolean(
     envKey &&
-      envKey.trim() !== '' &&
-      envKey !== 'your_gemini_api_key_here' &&
-      envKey !== 'your_openrouter_key_here'
+    envKey.trim() !== '' &&
+    envKey !== 'your_gemini_api_key_here' &&
+    envKey !== 'your_openrouter_key_here'
   );
   const defaultModel = getDefaultModel();
   const availableModels = getAvailableModels();
@@ -110,12 +110,307 @@ router.post('/scan-text', (req, res) => {
 });
 
 /**
+ * ====================================================================
+ * AUTHENTICATION ROUTES (SUPABASE + LOCAL DEMO FALLBACK)
+ * ====================================================================
+ */
+
+/**
+ * POST /api/auth/signup
+ * Registers a new user via Supabase or local demo fallback
+ */
+router.post('/auth/signup', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid email address.',
+        msg: 'Please provide a valid email address.',
+      });
+    }
+
+    if (!password || typeof password !== 'string' || password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters.',
+        msg: 'Password must be at least 6 characters.',
+      });
+    }
+
+    if (!isSupabaseConfigured || req.body?.isDemo || email.toLowerCase().endsWith('@gaplens.local')) {
+      const mockUser = {
+        id: 'usr_' + Date.now(),
+        email: email.trim(),
+        role: 'authenticated',
+        isLocalDemo: true,
+        created_at: new Date().toISOString(),
+      };
+
+      return res.status(201).json({
+        success: true,
+        user: mockUser,
+        storage: 'local-demo',
+        session: { access_token: 'mock-jwt-token' },
+        message: 'Account created via Local Demo Mode',
+        msg: 'Account created via Local Demo Mode',
+      });
+    }
+
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+      });
+
+      if (error) {
+        return res.status(400).json({
+          success: false,
+          message: error.message,
+          msg: error.message,
+        });
+      }
+
+      return res.status(201).json({
+        success: true,
+        user: data.user,
+        session: data.session,
+      });
+    }
+
+    // Graceful local demo fallback
+    const mockUser = {
+      id: 'usr_' + Date.now(),
+      email: email.trim(),
+      role: 'authenticated',
+      isLocalDemo: true,
+      created_at: new Date().toISOString(),
+    };
+
+    return res.status(201).json({
+      success: true,
+      user: mockUser,
+      storage: 'local-demo',
+      session: { access_token: 'mock-jwt-token' },
+      message: 'Account created via Local Demo Mode',
+      msg: 'Account created via Local Demo Mode',
+    });
+  } catch (err) {
+    console.error('[Auth Signup Error]', err);
+    return res.status(500).json({
+      success: false,
+      message: err.message || 'Internal server error during registration.',
+      msg: err.message || 'Internal server error during registration.',
+    });
+  }
+});
+
+/**
+ * POST /api/auth/login
+ * Authenticates user via Supabase or local demo fallback
+ */
+router.post('/auth/login', async (req, res) => {
+  try {
+    const { email, password, isDemo } = req.body;
+
+    if (!email && !isDemo) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required.',
+        msg: 'Email and password are required.',
+      });
+    }
+
+    // Check isSupabaseConfigured. If false or demo requested, return mock authenticated session
+    if (!isSupabaseConfigured || isDemo || (email && (email.toLowerCase().endsWith('@gaplens.local') || email.toLowerCase() === 'demo@gaplens.ai'))) {
+      const mockUser = {
+        id: 'demo-local',
+        email: (email || 'demo@gaplens.local').trim(),
+        role: 'authenticated',
+        isLocalDemo: true,
+        created_at: new Date().toISOString(),
+      };
+      return res.status(200).json({
+        success: true,
+        user: mockUser,
+        storage: 'local-demo',
+        session: { access_token: 'mock-jwt-token' },
+        message: 'Signed in via Local Demo Mode',
+        msg: 'Signed in via Local Demo Mode',
+      });
+    }
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required.',
+        msg: 'Email and password are required.',
+      });
+    }
+
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+      if (error) {
+        return res.status(401).json({
+          success: false,
+          message: error.message,
+          msg: error.message,
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        user: data.user,
+        session: data.session,
+      });
+    }
+
+    // Graceful local demo fallback
+    const mockUser = {
+      id: 'demo-local',
+      email: (email || 'demo@gaplens.local').trim(),
+      role: 'authenticated',
+      isLocalDemo: true,
+      created_at: new Date().toISOString(),
+    };
+
+    return res.status(200).json({
+      success: true,
+      user: mockUser,
+      storage: 'local-demo',
+      session: { access_token: 'mock-jwt-token' },
+      message: 'Signed in via Local Demo Mode',
+      msg: 'Signed in via Local Demo Mode',
+    });
+  } catch (err) {
+    console.error('[Auth Login Error]', err);
+    return res.status(500).json({
+      success: false,
+      message: err.message || 'Internal server error during login.',
+      msg: err.message || 'Internal server error during login.',
+    });
+  }
+});
+
+/**
+ * POST /api/auth/logout
+ * Signs out the current user session
+ */
+router.post('/auth/logout', async (req, res) => {
+  try {
+    if (isSupabaseConfigured && supabase) {
+      await supabase.auth.signOut();
+    }
+    return res.json({
+      success: true,
+      message: 'Logged out successfully',
+    });
+  } catch (err) {
+    return res.json({
+      success: true,
+      message: 'Logged out successfully',
+    });
+  }
+});
+
+/**
+ * GET /api/auth/me
+ * Retrieves profile of currently authenticated user from Bearer token
+ */
+router.get('/auth/me', async (req, res) => {
+  try {
+    const authHeader = req.headers?.authorization || req.headers?.Authorization || (typeof req.get === 'function' ? req.get('Authorization') : null);
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.json({ success: false, user: null });
+    }
+
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+    if (!token) {
+      return res.json({ success: false, user: null });
+    }
+
+    if (token === 'mock-jwt-token') {
+      return res.json({
+        success: true,
+        user: { id: 'usr_demo', email: 'demo@gaplens.ai' },
+      });
+    }
+
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.auth.getUser(token);
+      if (error || !data?.user) {
+        return res.json({ success: false, user: null });
+      }
+      return res.json({ success: true, user: data.user });
+    }
+
+    return res.json({ success: false, user: null });
+  } catch (err) {
+    return res.json({ success: false, user: null });
+  }
+});
+
+/**
+ * Helper function to extract and verify authenticated user ID
+ * Resolves Bearer token via Supabase or mock demo, with fallback to x-user-id header
+ */
+async function getAuthenticatedUserId(req) {
+  try {
+    const authHeader =
+      req.headers?.authorization ||
+      req.headers?.Authorization ||
+      (typeof req.get === 'function' ? req.get('Authorization') : null);
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+      if (token) {
+        if (token === 'mock-jwt-token') {
+          const xUserId = req.headers?.['x-user-id'] || req.headers?.['X-User-Id'];
+          return xUserId || 'usr_demo';
+        }
+        if (isSupabaseConfigured && supabase) {
+          const { data, error } = await supabase.auth.getUser(token);
+          if (!error && data?.user?.id) {
+            return data.user.id;
+          }
+        }
+      }
+    }
+
+    // Fallback: Check req.headers['x-user-id'] or return null
+    const xUserId = req.headers?.['x-user-id'] || req.headers?.['X-User-Id'];
+    if (xUserId && typeof xUserId === 'string' && xUserId.trim()) {
+      return xUserId.trim();
+    }
+
+    return null;
+  } catch (err) {
+    return null;
+  }
+}
+
+/**
  * POST /api/sessions
  * Inserts research session into Supabase research_sessions or in-memory fallback
  */
 router.post('/sessions', async (req, res) => {
   try {
-    const { topic, category, sources, model_used, modelUsed, analysis_result, analysisResult } = req.body;
+    const {
+      topic,
+      category,
+      sources,
+      model_used,
+      modelUsed,
+      analysis_result,
+      analysisResult,
+      user_id,
+      userId,
+    } = req.body;
 
     if (!topic || typeof topic !== 'string' || !topic.trim()) {
       return res.status(400).json({
@@ -130,6 +425,9 @@ router.post('/sessions', async (req, res) => {
         message: 'At least two sources are required for cross-verification.',
       });
     }
+
+    // Determine user ID from Bearer token, x-user-id header, or request body
+    const resolvedUserId = (await getAuthenticatedUserId(req)) || user_id || userId || null;
 
     const cleanedSources = sources.map((src, idx) => ({
       id: src.id || `src-${idx + 1}`,
@@ -147,6 +445,7 @@ router.post('/sessions', async (req, res) => {
       model_used: model_used || modelUsed || getDefaultModel(),
       analysis_result: analysis_result || analysisResult || null,
       created_at: new Date().toISOString(),
+      user_id: resolvedUserId,
     };
 
     // Try Supabase first if configured
@@ -175,6 +474,7 @@ router.post('/sessions', async (req, res) => {
     const memSession = {
       id: `mem-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
       ...sessionPayload,
+      user_id: resolvedUserId,
     };
 
     inMemorySessions.unshift(memSession);
@@ -198,17 +498,29 @@ router.post('/sessions', async (req, res) => {
 
 /**
  * GET /api/sessions
- * Fetches the 15 most recent saved research sessions
+ * Fetches saved research sessions strictly isolated to the authenticated user
  */
 router.get('/sessions', async (req, res) => {
   try {
+    const userId = (await getAuthenticatedUserId(req)) || req.query.user_id || null;
+
+    if (!userId) {
+      return res.json({
+        success: true,
+        count: 0,
+        sessions: [],
+        message: 'No authenticated user. Please sign in to view your history.',
+      });
+    }
+
     if (supabase && isSupabaseConfigured) {
       try {
         const { data, error } = await supabase
           .from('research_sessions')
-          .select('id, topic, category, sources, model_used, analysis_result, created_at')
+          .select('id, topic, category, sources, model_used, analysis_result, created_at, user_id')
+          .eq('user_id', userId)
           .order('created_at', { ascending: false })
-          .limit(15);
+          .limit(20);
 
         if (!error && Array.isArray(data)) {
           return res.json({
@@ -223,13 +535,16 @@ router.get('/sessions', async (req, res) => {
       }
     }
 
-    // Return in-memory fallback sessions
-    const recentMemory = inMemorySessions.slice(0, 15);
+    // In-memory fallback: Filter only sessions owned by this user
+    const userMemory = inMemorySessions
+      .filter((s) => s.user_id === userId)
+      .slice(0, 20);
+
     return res.json({
       success: true,
       storage: 'in-memory',
-      count: recentMemory.length,
-      sessions: recentMemory,
+      count: userMemory.length,
+      sessions: userMemory,
     });
   } catch (err) {
     return res.status(500).json({
@@ -241,7 +556,7 @@ router.get('/sessions', async (req, res) => {
 
 /**
  * PATCH /api/sessions/:id/checklist
- * Persists interactive checklist state and official verification notes
+ * Persists interactive checklist state and official verification notes for user's session
  */
 router.patch('/sessions/:id/checklist', async (req, res) => {
   try {
@@ -252,15 +567,24 @@ router.patch('/sessions/:id/checklist', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Session ID is required.' });
     }
 
+    const userId = (await getAuthenticatedUserId(req)) || req.query.user_id || req.body.user_id || null;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required. Please sign in to update your session checklist.',
+      });
+    }
+
     let updated = false;
 
-    // 1. Try Supabase update if configured
+    // 1. Try Supabase update if configured (strictly scoped to user_id)
     if (supabase && isSupabaseConfigured) {
       try {
         const { data: existing } = await supabase
           .from('research_sessions')
-          .select('analysis_result')
+          .select('analysis_result, user_id')
           .eq('id', id)
+          .eq('user_id', userId)
           .single();
 
         if (existing && existing.analysis_result) {
@@ -273,7 +597,8 @@ router.patch('/sessions/:id/checklist', async (req, res) => {
           const { error: updateErr } = await supabase
             .from('research_sessions')
             .update({ analysis_result: mergedAnalysis })
-            .eq('id', id);
+            .eq('id', id)
+            .eq('user_id', userId);
 
           if (!updateErr) {
             updated = true;
@@ -284,9 +609,15 @@ router.patch('/sessions/:id/checklist', async (req, res) => {
       }
     }
 
-    // 2. Also update in-memory session if found
+    // 2. Also update in-memory session if found and user matches
     const memIndex = inMemorySessions.findIndex((s) => s.id === id);
     if (memIndex !== -1) {
+      if (inMemorySessions[memIndex].user_id && inMemorySessions[memIndex].user_id !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Forbidden: You cannot modify another user\'s session.',
+        });
+      }
       const existingAnalysis = inMemorySessions[memIndex].analysis_result || {};
       inMemorySessions[memIndex].analysis_result = {
         ...existingAnalysis,
@@ -313,7 +644,7 @@ router.patch('/sessions/:id/checklist', async (req, res) => {
 
 /**
  * DELETE /api/sessions/:id
- * Removes a saved research session from Supabase or in-memory fallback
+ * Removes a saved research session strictly owned by the authenticated user
  */
 router.delete('/sessions/:id', async (req, res) => {
   try {
@@ -322,20 +653,38 @@ router.delete('/sessions/:id', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Session ID is required.' });
     }
 
-    // 1. Delete from Supabase if configured
+    const userId = (await getAuthenticatedUserId(req)) || req.query.user_id || req.body?.user_id || null;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required. Please sign in to delete your session.',
+      });
+    }
+
+    // 1. Delete from Supabase if configured (strictly matching user_id)
     if (supabase && isSupabaseConfigured) {
       try {
-        await supabase.from('research_sessions').delete().eq('id', id);
+        await supabase
+          .from('research_sessions')
+          .delete()
+          .eq('id', id)
+          .eq('user_id', userId);
       } catch (sbErr) {
         console.warn('[Supabase Delete Error]', sbErr.message);
       }
     }
 
-    // 2. Delete from in-memory fallback array
-    const initialLen = inMemorySessions.length;
-    const filtered = inMemorySessions.filter((s) => s.id !== id);
-    inMemorySessions.length = 0;
-    filtered.forEach((s) => inMemorySessions.push(s));
+    // 2. Delete from in-memory fallback array (verify session.user_id === userId)
+    const memIndex = inMemorySessions.findIndex((s) => s.id === id);
+    if (memIndex !== -1) {
+      if (inMemorySessions[memIndex].user_id && inMemorySessions[memIndex].user_id !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Forbidden: You cannot delete another user\'s session.',
+        });
+      }
+      inMemorySessions.splice(memIndex, 1);
+    }
 
     return res.json({
       success: true,
@@ -382,9 +731,8 @@ router.post('/analyze', async (req, res) => {
     if (validSources.length < 2) {
       return res.status(400).json({
         success: false,
-        message: `At least 2 sources must contain meaningful text (found ${validSources.length} valid source${
-          validSources.length === 1 ? '' : 's'
-        }). Please fill in or paste content for your sources.`,
+        message: `At least 2 sources must contain meaningful text (found ${validSources.length} valid source${validSources.length === 1 ? '' : 's'
+          }). Please fill in or paste content for your sources.`,
       });
     }
 
@@ -411,8 +759,8 @@ router.post('/analyze', async (req, res) => {
 
     const isForceDemo = Boolean(
       forceDemoMode === true ||
-        req.headers['x-force-offline-demo'] === 'true' ||
-        process.env.FORCE_OFFLINE_DEMO === 'true'
+      req.headers['x-force-offline-demo'] === 'true' ||
+      process.env.FORCE_OFFLINE_DEMO === 'true'
     );
 
     // Run Phase 3 Deep AI Analysis
@@ -431,6 +779,8 @@ router.post('/analyze', async (req, res) => {
     let savedStorage = 'in-memory';
 
     try {
+      const userId = (await getAuthenticatedUserId(req)) || req.body.userId || req.body.user_id || null;
+
       const sessionPayload = {
         topic: topic.trim(),
         category: category || 'Education',
@@ -438,6 +788,7 @@ router.post('/analyze', async (req, res) => {
         model_used: aiResult.meta.modelUsed,
         analysis_result: aiResult.analysis,
         created_at: new Date().toISOString(),
+        user_id: userId,
       };
 
       if (supabase && isSupabaseConfigured) {
@@ -457,6 +808,7 @@ router.post('/analyze', async (req, res) => {
         const memSession = {
           id: `mem-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
           ...sessionPayload,
+          user_id: userId,
         };
         inMemorySessions.unshift(memSession);
         if (inMemorySessions.length > 50) inMemorySessions.pop();

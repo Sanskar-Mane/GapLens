@@ -15,6 +15,9 @@ import {
   ExternalLink,
   Layers,
   ArrowRight,
+  Scale,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import SourceInspectorDrawer from './SourceInspectorDrawer';
 
@@ -64,6 +67,7 @@ export default function AnalysisResultsView({
   onProceedToChecklist,
 }) {
   const [activeTab, setActiveTab] = useState('gaps'); // 'gaps' | 'conflicts' | 'outdated' | 'facts'
+  const [isPreMortemExpanded, setIsPreMortemExpanded] = useState(true);
 
   // Source Inspector Drawer state
   const [inspectorState, setInspectorState] = useState({
@@ -116,7 +120,27 @@ export default function AnalysisResultsView({
     informationGaps = [],
     contradictions = [],
     outdatedWarnings = [],
+    decisionPreMortem = null,
   } = analysis;
+
+  const preMortemData = decisionPreMortem || {
+    overallRiskLevel: readinessScore < 50 ? 'Severe Risk' : readinessScore < 70 ? 'High Risk' : 'Moderate Risk',
+    estimatedDelay: '30 to 60 Days Lodgment Delay',
+    consequenceSummary:
+      'Submitting based on unresolved contradictory criteria risks immediate statutory disqualification or audit rejection. Missing verification of mandatory prerequisites creates critical compliance vulnerabilities.',
+    criticalFailurePoints: [
+      ...contradictions.slice(0, 2).map((c) => ({
+        darkSpotRef: c.id,
+        failureScenario: `Statutory challenge or rejection caused by divergence regarding ${c.parameter}.`,
+        penaltyOrLoss: 'Application rejection, processing fee loss, or required refiling.',
+      })),
+      ...informationGaps.slice(0, 2).map((g) => ({
+        darkSpotRef: g.id,
+        failureScenario: `Non-compliance with undisclosed mandatory prerequisite: "${g.title}".`,
+        penaltyOrLoss: 'Indefinite hold or forfeiture of administrative benefits.',
+      })),
+    ],
+  };
 
   // Resolve source by ID
   const getSourceById = (sourceId) => {
@@ -253,7 +277,106 @@ export default function AnalysisResultsView({
         )}
       </div>
 
-      {/* 2. BENTO GRID LAYOUT: 8 COLS (LEFT FINDINGS) + 4 COLS (RIGHT READINESS) */}
+      {/* 2. PRE-MORTEM DECISION RISK SIMULATOR BANNER */}
+      {preMortemData && (
+        <div className="rounded-2xl border border-zinc-200/90 bg-white p-5 shadow-soft dark:border-zinc-800 dark:bg-zinc-900 transition-colors">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800/80 pb-3">
+            <div className="flex items-center space-x-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shrink-0">
+                <ShieldAlert className="h-4 w-4" />
+              </span>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
+                    Pre-Mortem Decision Risk Simulator
+                  </h3>
+                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                    Forward Impact Simulation
+                  </span>
+                </div>
+                <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
+                  Stress-test simulating real-world statutory rejection and financial consequences of premature action
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2 self-start sm:self-auto">
+              {/* Overall Decision Risk Badge */}
+              <StatusDotPill
+                status={preMortemData.overallRiskLevel}
+                label={preMortemData.overallRiskLevel || 'High Risk'}
+              />
+              {/* Estimated Delay Pill */}
+              <span className="inline-flex items-center space-x-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 px-3 py-1 text-xs font-semibold text-zinc-700 dark:text-zinc-300 border border-zinc-200/60 dark:border-zinc-700/60">
+                <Clock className="h-3.5 w-3.5 text-zinc-500" />
+                <span>{preMortemData.estimatedDelay || '30 to 60 Days Delay'}</span>
+              </span>
+              {/* Expand/Collapse Toggle */}
+              <button
+                type="button"
+                onClick={() => setIsPreMortemExpanded(!isPreMortemExpanded)}
+                className="rounded-full p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 transition-colors"
+                title={isPreMortemExpanded ? 'Collapse Simulator' : 'Expand Simulator'}
+                aria-label="Toggle Simulator Details"
+              >
+                {isPreMortemExpanded ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Consequence Summary */}
+          {preMortemData.consequenceSummary && (
+            <p className="mt-3 text-xs leading-relaxed text-zinc-700 dark:text-zinc-300">
+              <strong className="text-zinc-900 dark:text-white font-semibold">Simulated Failure Consequence: </strong>
+              {preMortemData.consequenceSummary}
+            </p>
+          )}
+
+          {/* Critical Failure Points Grid */}
+          {isPreMortemExpanded &&
+            Array.isArray(preMortemData.criticalFailurePoints) &&
+            preMortemData.criticalFailurePoints.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800/80">
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-2.5">
+                  Critical Failure Points &amp; Statutory Penalties
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {preMortemData.criticalFailurePoints.map((pt, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded-xl border border-zinc-200/80 bg-zinc-50/70 p-3.5 dark:border-zinc-800 dark:bg-zinc-850/60 flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                          <span className="font-mono text-[10px] font-bold rounded bg-zinc-200/80 dark:bg-zinc-800 px-1.5 py-0.5 text-zinc-800 dark:text-zinc-200">
+                            {pt.darkSpotRef}
+                          </span>
+                          <span className="text-[10px] font-medium text-rose-600 dark:text-rose-400 flex items-center space-x-1">
+                            <AlertTriangle className="h-3 w-3 shrink-0" />
+                            <span>Failure Point #{idx + 1}</span>
+                          </span>
+                        </div>
+                        <p className="text-xs font-medium text-zinc-800 dark:text-zinc-200 leading-snug">
+                          {pt.failureScenario}
+                        </p>
+                      </div>
+                      <div className="mt-2.5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800 text-[11px] text-zinc-600 dark:text-zinc-400">
+                        <strong className="text-zinc-900 dark:text-zinc-200 font-semibold">Penalty / Loss: </strong>
+                        {pt.penaltyOrLoss}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+        </div>
+      )}
+
+      {/* 3. BENTO GRID LAYOUT: 8 COLS (LEFT FINDINGS) + 4 COLS (RIGHT READINESS) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
         {/* ================================================================= */}
@@ -400,6 +523,35 @@ export default function AnalysisResultsView({
                           <strong className="text-zinc-700 dark:text-zinc-300">Resolution: </strong>
                           {conf.resolutionAdvice}
                         </p>
+                      )}
+
+                      {/* Authoritative Precedence Badge: Hierarchy of Authority (LHoA) Arbiter */}
+                      {conf.precedenceVerdict && (
+                        <div className="mt-3 rounded-xl border border-zinc-200/90 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900/90 shadow-2xs">
+                          <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-zinc-100 dark:border-zinc-800/60 pb-2">
+                            <div className="flex items-center space-x-1.5">
+                              <Scale className="h-3.5 w-3.5 text-zinc-900 dark:text-zinc-100" />
+                              <span className="text-[11px] font-bold text-zinc-900 dark:text-white">
+                                Hierarchy of Authority (LHoA) Arbiter
+                              </span>
+                              <span className="rounded-md bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-mono font-medium text-zinc-700 dark:text-zinc-300">
+                                Precedence:{' '}
+                                {conf.precedenceVerdict.bindingSourceId === conf.sourceA?.sourceId
+                                  ? conf.sourceA?.title || 'Source A'
+                                  : conf.sourceB?.title || 'Source B'}
+                              </span>
+                            </div>
+                            <span className="inline-flex items-center rounded-full bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 px-2.5 py-0.5 text-[10px] font-bold">
+                              {conf.precedenceVerdict.confidence || 'Definitive Precedence'}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-xs leading-relaxed text-zinc-700 dark:text-zinc-300">
+                            <strong className="text-zinc-900 dark:text-white font-semibold">
+                              Authoritative Verdict:{' '}
+                            </strong>
+                            {conf.precedenceVerdict.legalWeightReasoning}
+                          </p>
+                        </div>
                       )}
 
                       <div className="mt-3 flex items-center justify-end space-x-3 pt-2 border-t border-zinc-200/40 dark:border-zinc-800/50">

@@ -8,8 +8,11 @@ import {
   Sliders,
   Database,
   Sparkles,
+  User,
+  LogOut,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function Navbar({
   backendHealth,
@@ -22,8 +25,10 @@ export default function Navbar({
   currentStep = 1,
   onStepClick,
   hasAnalysis = false,
+  onOpenAuthModal,
 }) {
   const { theme, toggleTheme } = useTheme();
+  const { user, logout } = useAuth();
   const isSupabaseConnected = Boolean(backendHealth?.data?.supabaseConnected);
 
   // Tab definitions
@@ -36,7 +41,7 @@ export default function Navbar({
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-zinc-200/80 bg-white/95 backdrop-blur-md transition-colors duration-200 dark:border-zinc-800 dark:bg-zinc-950/95 no-print">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
         
         {/* Left: Minimalist square black icon container + GapLens title */}
         <div className="flex items-center space-x-3 shrink-0">
@@ -91,6 +96,38 @@ export default function Navbar({
         {/* Right: Circular / rounded icon buttons */}
         <div className="flex items-center space-x-2 shrink-0">
           
+          {/* Email Authentication Pill / Button */}
+          {user ? (
+            <div className="flex items-center space-x-1.5 rounded-full border border-zinc-200/80 bg-zinc-50/80 pl-2.5 pr-1 py-1 text-xs dark:border-zinc-800 dark:bg-zinc-900/80 shadow-soft">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+              <span
+                className="font-medium text-zinc-700 dark:text-zinc-200 max-w-[110px] truncate"
+                title={user.email}
+              >
+                {user.email ? user.email.split('@')[0] : 'User'}
+              </span>
+              <button
+                type="button"
+                onClick={logout}
+                className="flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-200/60 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 transition-colors"
+                title="Sign Out"
+                aria-label="Sign Out"
+              >
+                <LogOut className="h-3 w-3" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onOpenAuthModal}
+              className="inline-flex items-center space-x-1.5 rounded-full border border-zinc-200/80 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 shadow-soft hover:bg-zinc-100 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white transition-colors"
+              title="Sign in or create an account"
+            >
+              <User className="h-3.5 w-3.5" />
+              <span>Sign In</span>
+            </button>
+          )}
+
           {/* Subtle Supabase Connection Dot */}
           <div
             className="hidden xl:inline-flex items-center space-x-1.5 rounded-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 px-2.5 py-1 text-[11px] font-medium text-zinc-600 dark:text-zinc-400"

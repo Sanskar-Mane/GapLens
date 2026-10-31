@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Navbar from './components/Navbar';
 import ApiKeyModal from './components/ApiKeyModal';
 import MetricCardsRow from './components/MetricCardsRow';
@@ -9,7 +9,9 @@ import AnalysisResultsView from './components/AnalysisResultsView';
 import VerificationChecklistView from './components/VerificationChecklistView';
 import AnalysisLoadingOverlay from './components/AnalysisLoadingOverlay';
 import SavedSessionsDrawer from './components/SavedSessionsDrawer';
+import AuthModal from './components/AuthModal';
 import { ThemeProvider } from './context/ThemeContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import {
   checkHealth,
   fetchScenarios,
@@ -28,6 +30,8 @@ import {
 } from 'lucide-react';
 
 function MainApp() {
+  const { user } = useAuth();
+
   // Wizard Active Step: 1 = Goal, 2 = Sources, 3 = Analysis, 4 = Checklist
   const [currentStep, setCurrentStep] = useState(1);
 
@@ -47,6 +51,7 @@ function MainApp() {
 
   // Modals & Drawers State
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isSavedSessionsOpen, setIsSavedSessionsOpen] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState(null);
 
@@ -174,6 +179,17 @@ function MainApp() {
     setCurrentStep(1);
   };
 
+  // 3b. User switch or logout isolation handler: immediately resets workspace & drawer
+  const prevUserIdRef = useRef(user?.id);
+  useEffect(() => {
+    if (prevUserIdRef.current && prevUserIdRef.current !== user?.id) {
+      setCurrentSessionId(null);
+      setIsSavedSessionsOpen(false);
+      handleResetWorkspace();
+    }
+    prevUserIdRef.current = user?.id;
+  }, [user?.id]);
+
   // 4. Source Mutation Handlers
   const handleAddSource = () => {
     if (sources.length >= 6) return;
@@ -276,6 +292,7 @@ function MainApp() {
           sources: validSources,
           modelUsed: result.meta?.modelUsed || activeModel,
           analysisResult: result.analysis,
+          user_id: user?.id,
         })
           .then((res) => {
             if (res?.session?.id) {
@@ -348,6 +365,7 @@ function MainApp() {
         )}
         activeModel={activeModel}
         onOpenKeyModal={() => setIsKeyModalOpen(true)}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
         onOpenSavedSessions={() => setIsSavedSessionsOpen(true)}
         onResetWorkspace={handleResetWorkspace}
         forceOfflineDemo={forceOfflineDemo}
@@ -372,7 +390,7 @@ function MainApp() {
       />
 
       {/* Main Container */}
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-7 sm:px-6 lg:px-8 space-y-6">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6 py-6 space-y-6">
         
         {/* Top 4 KPI Metrics Row (Across Step 2, Step 3, & Step 4) */}
         {currentStep >= 2 && (
@@ -550,7 +568,7 @@ function MainApp() {
 
       {/* Footer */}
       <footer className="border-t border-zinc-200/80 bg-white py-5 text-center text-xs text-zinc-400 dark:border-zinc-900 dark:bg-zinc-950 dark:text-zinc-500 mt-auto no-print">
-        <div className="mx-auto max-w-7xl px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div className="mx-auto max-w-6xl px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div>
             <strong className="text-zinc-800 dark:text-zinc-200 font-semibold">GapLens</strong> &bull; Information Gap &amp; Contradiction Detection Platform
           </div>
@@ -562,6 +580,13 @@ function MainApp() {
           </div>
         </div>
       </footer>
+
+      {/* Email Authentication Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        backendHealth={backendHealth}
+      />
 
       {/* API Key & Model Config Modal */}
       <ApiKeyModal
@@ -584,6 +609,7 @@ function MainApp() {
         isOpen={isSavedSessionsOpen}
         onClose={() => setIsSavedSessionsOpen(false)}
         onLoadSession={handleLoadSavedSession}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
       />
 
       {/* Pipeline Loading Overlay */}
@@ -599,7 +625,9 @@ function MainApp() {
 export default function App() {
   return (
     <ThemeProvider>
-      <MainApp />
+      <AuthProvider>
+        <MainApp />
+      </AuthProvider>
     </ThemeProvider>
   );
 }

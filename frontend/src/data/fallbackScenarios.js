@@ -254,6 +254,12 @@ export const FALLBACK_ANALYSES = {
         },
         resolutionAdvice:
           'Verify whether the Rs. 2.5 Lakh cap applies to specific categories while Rs. 8.0 Lakh applies to EBC/OBC tiers on the official portal.',
+        precedenceVerdict: {
+          bindingSourceId: 'src-1',
+          confidence: 'Definitive Precedence',
+          legalWeightReasoning:
+            'Tier 2 Official Portal Guidelines strictly override Tier 3 EduCareer blog claims. The statutory Rs. 2,50,000 ceiling is legally enforceable; reliance on the unverified Rs. 8,00,000 limit will lead to instant disqualification.',
+        },
       },
       {
         id: 'conf-2',
@@ -276,6 +282,12 @@ export const FALLBACK_ANALYSES = {
         },
         resolutionAdvice:
           'Do not rely on a stamp-paper affidavit; apply for a Tehsildar-issued digital income certificate.',
+        precedenceVerdict: {
+          bindingSourceId: 'src-1',
+          confidence: 'Definitive Precedence',
+          legalWeightReasoning:
+            'Official government regulations mandate revenue department (Tehsildar) certification over informal Tier 3 self-attested affidavits. Stamp paper declarations are non-compliant under current statutory rules.',
+        },
       },
       {
         id: 'conf-3',
@@ -298,6 +310,12 @@ export const FALLBACK_ANALYSES = {
         },
         resolutionAdvice:
           'Source 3 is from the 2023-24 cycle; follow the online submission workflow in Source 1.',
+        precedenceVerdict: {
+          bindingSourceId: 'src-1',
+          confidence: 'Definitive Precedence',
+          legalWeightReasoning:
+            'Current 2026 guidelines mandate centralized online submission, superseding archived 2023 physical lodgment circulars under standard temporal administrative doctrine.',
+        },
       },
     ],
     outdatedWarnings: [
@@ -358,6 +376,35 @@ export const FALLBACK_ANALYSES = {
         reason: 'Mentioned only in an undated student FAQ snippet.',
       },
     ],
+    decisionPreMortem: {
+      overallRiskLevel: 'Severe Risk',
+      estimatedDelay: '45 to 90 Days Lodgment Rejection / Appeal Window',
+      consequenceSummary:
+        'Submitting based on unresolved contradictory criteria will trigger immediate application rejection by the District Nodal Officer during scrutiny due to submitting an unverified stamp-paper affidavit instead of a digital Tehsildar certificate, accompanied by permanent forfeiture of the 2026 scholarship disbursement.',
+      criticalFailurePoints: [
+        {
+          darkSpotRef: 'conf-2',
+          failureScenario:
+            'Immediate rejection during document verification round if applying with a Rs. 100 self-affidavit instead of the mandated Tehsildar digital certificate.',
+          penaltyOrLoss:
+            'Statutory application dismissal, zero grace period for re-upload, loss of full tuition fee reimbursement (approx Rs. 65,000 to Rs. 1,20,000).',
+        },
+        {
+          darkSpotRef: 'gap-1',
+          failureScenario:
+            'Mid-course revocation of scholarship funding in Year 2 due to unfulfilled minimum 75% attendance or undisclosed CGPA threshold.',
+          penaltyOrLoss:
+            'Unexpected personal liability for subsequent year college fees and clawback of disbursed hostel stipends.',
+        },
+        {
+          darkSpotRef: 'conf-1',
+          failureScenario:
+            'Submitting under Rs. 8.0 Lakh income ceiling when actual family income exceeds the strict Rs. 2.5 Lakh statutory ceiling.',
+          penaltyOrLoss:
+            'Disqualification for fraudulent declaration and blacklisting across state scholarship portals.',
+        },
+      ],
+    },
   },
 
   'fssai-cloud-kitchen': {
@@ -470,6 +517,12 @@ export const FALLBACK_ANALYSES = {
         },
         resolutionAdvice:
           'FSSAI national regulations strictly mandate State Licensing above Rs. 12 Lakhs per annum. Do not rely on the Rs. 20 Lakh figure on FoSCoS.',
+        precedenceVerdict: {
+          bindingSourceId: 'src-1',
+          confidence: 'Definitive Precedence',
+          legalWeightReasoning:
+            'Tier 1 Central FSSAI statutory regulations override municipal guidance (Tier 2/3). The Rs. 12 Lakh ceiling for basic registration is national law; operating above Rs. 12 Lakh without a State License is an offense under Food Safety Act Section 31.',
+        },
       },
       {
         id: 'conf-2',
@@ -492,6 +545,12 @@ export const FALLBACK_ANALYSES = {
         },
         resolutionAdvice:
           'Source 3 is an archived 2021 circular; domestic LPG exemptions have been superseded by current commercial fire bylaws.',
+        precedenceVerdict: {
+          bindingSourceId: 'src-2',
+          confidence: 'Definitive Precedence',
+          legalWeightReasoning:
+            'Municipal Health Trade Regulations and current 2026 commercial safety rules supersede archived 2021 municipal fee schedules. Domestic LPG exemptions are nullified under updated fire safety bylaws.',
+        },
       },
     ],
     outdatedWarnings: [
@@ -541,6 +600,35 @@ export const FALLBACK_ANALYSES = {
         reason: 'Mandatory prerequisite for Form A basic registration approval.',
       },
     ],
+    decisionPreMortem: {
+      overallRiskLevel: 'Severe Risk',
+      estimatedDelay: '30 to 60 Days Operational Sealing & Inspection Delay',
+      consequenceSummary:
+        'Launching a delivery kitchen relying on domestic LPG or unverified turnover thresholds risks immediate municipal sealing, disconnection of commercial aggregator onboarding, and statutory fines under Section 31 of the Food Safety & Standards Act.',
+      criticalFailurePoints: [
+        {
+          darkSpotRef: 'gap-1',
+          failureScenario:
+            'Surprise municipal inspection flags commercial cooking on domestic LPG cylinders without Fire Department NOC.',
+          penaltyOrLoss:
+            'Immediate kitchen sealing, criminal notice, and compounding fines up to Rs. 2,00,000 under Fire Prevention and Safety Act.',
+        },
+        {
+          darkSpotRef: 'conf-1',
+          failureScenario:
+            'Operating with Basic FSSAI Registration after surpassing Rs. 12 Lakh turnover under the false belief that PMC permits up to Rs. 20 Lakh.',
+          penaltyOrLoss:
+            'Penalty up to Rs. 5,00,000 and imprisonment up to 6 months for operating without mandatory State License under FSSAI Section 31.',
+        },
+        {
+          darkSpotRef: 'gap-2',
+          failureScenario:
+            'Food delivery aggregators (Swiggy/Zomato) suspend merchant account due to missing Maharashtra Shop & Establishment Act (Gumasta) certificate.',
+          penaltyOrLoss:
+            'Complete operational standstill, de-listing from delivery platforms, and loss of commercial revenue.',
+        },
+      ],
+    },
   },
 
   'overseas-edu-subsidy': {
@@ -653,6 +741,12 @@ export const FALLBACK_ANALYSES = {
         },
         resolutionAdvice:
           'CSIS central guidelines strictly enforce the Rs. 4.50 Lakh EBC cap. The Rs. 6 Lakh figure likely refers to a state-level minority subsidy.',
+        precedenceVerdict: {
+          bindingSourceId: 'src-1',
+          confidence: 'Definitive Precedence',
+          legalWeightReasoning:
+            'Tier 1 Ministry of Education Central CSIS statutory guidelines override secondary education advisory blogs (Tier 3). The Rs. 4.50 Lakh income threshold is strict; students applying under the Rs. 6.0 Lakh figure are rejected by Canara Bank nodal audit.',
+        },
       },
       {
         id: 'conf-2',
@@ -675,6 +769,12 @@ export const FALLBACK_ANALYSES = {
         },
         resolutionAdvice:
           'Nationalized banks reject self-declarations; an income certificate issued by a Sub-Divisional Magistrate or Tehsildar is mandatory.',
+        precedenceVerdict: {
+          bindingSourceId: 'src-1',
+          confidence: 'Definitive Precedence',
+          legalWeightReasoning:
+            'Statutory government subsidy rules mandate authorized revenue officer (Tehsildar / SDM) digital income certification. Self-attested affidavits are routinely rejected by nationalized lending institutions.',
+        },
       },
     ],
     outdatedWarnings: [
@@ -724,5 +824,34 @@ export const FALLBACK_ANALYSES = {
         reason: 'Bank brochure is undated and lacks specific calendar deadlines.',
       },
     ],
+    decisionPreMortem: {
+      overallRiskLevel: 'High Risk',
+      estimatedDelay: '60 to 90 Days Subsidy Disbursal Halt & Audit Scrutiny',
+      consequenceSummary:
+        'Enrolling in an overseas master’s program without verified full-time accreditation or declaring income above the strict Rs. 4.5 Lakh ceiling causes immediate disqualification from the central interest subsidy, forcing the student to pay compound loan interest out-of-pocket.',
+      criticalFailurePoints: [
+        {
+          darkSpotRef: 'gap-1',
+          failureScenario:
+            'Enrolling in a foreign master’s program that utilizes hybrid or online coursework, only to discover CSIS covers strictly full-time on-campus degrees.',
+          penaltyOrLoss:
+            'Retroactive subsidy cancellation, resulting in unbudgeted personal interest liabilities of Rs. 3,50,000 to Rs. 8,00,000 over course duration.',
+        },
+        {
+          darkSpotRef: 'conf-1',
+          failureScenario:
+            'Applying for bank subsidy approval based on the Rs. 6.0 Lakh blog ceiling when actual family income is Rs. 5.2 Lakh.',
+          penaltyOrLoss:
+            'Nodal scheme rejection by Canara Bank, permanent loss of interest waiver, and accumulation of standard commercial loan interest rates.',
+        },
+        {
+          darkSpotRef: 'gap-3',
+          failureScenario:
+            'Failing to submit annual academic marksheet and income continuation certificate to the home loan branch before the undisclosed annual cutoff date.',
+          penaltyOrLoss:
+            'Permanent stoppage of interest subsidy during the moratorium period.',
+        },
+      ],
+    },
   },
 };

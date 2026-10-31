@@ -113,6 +113,20 @@ async function executeAllTests() {
     assert(missing.length >= 1, 'Must have at least 1 missing parameter');
   });
 
+  runTest('Scholarship 2026 includes Hierarchy of Authority (LHoA) precedence verdicts and Pre-Mortem Simulator', () => {
+    const analysis = PRECOMPUTED_ANALYSES['scholarship-2026'];
+    assert(analysis.contradictions.every((c) => c.precedenceVerdict), 'All contradictions must carry precedenceVerdict');
+    const incomeConf = analysis.contradictions.find((c) => c.parameter.includes('Income'));
+    assert.strictEqual(incomeConf.precedenceVerdict.bindingSourceId, 'src-1');
+    assert.strictEqual(incomeConf.precedenceVerdict.confidence, 'Definitive Precedence');
+    assert(incomeConf.precedenceVerdict.legalWeightReasoning.includes('Tier 2') || incomeConf.precedenceVerdict.legalWeightReasoning.includes('Official'));
+
+    assert(analysis.decisionPreMortem, 'Must include decisionPreMortem block');
+    assert.strictEqual(analysis.decisionPreMortem.overallRiskLevel, 'Severe Risk');
+    assert(analysis.decisionPreMortem.estimatedDelay.includes('Days'));
+    assert(analysis.decisionPreMortem.criticalFailurePoints.length >= 2);
+  });
+
   // -------------------------------------------------------------
   // TEST GROUP 2: HACKATHON SCENARIO 2 (FSSAI CLOUD KITCHEN)
   // -------------------------------------------------------------
@@ -137,6 +151,13 @@ async function executeAllTests() {
     assert(gumastaGap, 'Must flag missing Maharashtra Shop & Establishment Act status');
   });
 
+  runTest('FSSAI scenario includes LHoA precedence arbiter and Pre-Mortem risk consequence', () => {
+    const analysis = PRECOMPUTED_ANALYSES['fssai-cloud-kitchen'];
+    assert(analysis.contradictions.every((c) => c.precedenceVerdict), 'All contradictions must carry precedenceVerdict');
+    assert(analysis.decisionPreMortem, 'Must include decisionPreMortem block');
+    assert.strictEqual(analysis.decisionPreMortem.overallRiskLevel, 'Severe Risk');
+  });
+
   // -------------------------------------------------------------
   // TEST GROUP 3: HACKATHON SCENARIO 3 (OVERSEAS EDUCATION SUBSIDY)
   // -------------------------------------------------------------
@@ -159,6 +180,13 @@ async function executeAllTests() {
       (g) => g.title.toLowerCase().includes('part-time') || g.title.toLowerCase().includes('hybrid')
     );
     assert(hybridGap, 'Must flag part-time/hybrid degree policy dark spot');
+  });
+
+  runTest('Overseas subsidy scenario includes LHoA precedence arbiter and Pre-Mortem risk consequence', () => {
+    const analysis = PRECOMPUTED_ANALYSES['overseas-edu-subsidy'];
+    assert(analysis.contradictions.every((c) => c.precedenceVerdict), 'All contradictions must carry precedenceVerdict');
+    assert(analysis.decisionPreMortem, 'Must include decisionPreMortem block');
+    assert.strictEqual(analysis.decisionPreMortem.overallRiskLevel, 'High Risk');
   });
 
   // -------------------------------------------------------------
@@ -272,6 +300,8 @@ async function executeAllTests() {
     assert(res.analysis.contradictions.length >= 2);
     assert(res.analysis.informationGaps.length >= 2);
     assert(res.analysis.rubricStatus.length === 6);
+    assert(res.analysis.decisionPreMortem, 'Must return decisionPreMortem');
+    assert(res.analysis.contradictions[0].precedenceVerdict, 'Must return precedenceVerdict');
   });
 
   await runAsyncTest('analyzeSourcesWithAI handles unknown custom topic with dynamic fallback', async () => {
@@ -289,6 +319,8 @@ async function executeAllTests() {
     assert(res.analysis.readinessScore > 0);
     assert(res.analysis.contradictions.length >= 1);
     assert(res.analysis.informationGaps.length >= 1);
+    assert(res.analysis.decisionPreMortem, 'Must generate decisionPreMortem');
+    assert(res.analysis.contradictions[0].precedenceVerdict, 'Must generate precedenceVerdict');
   });
 
   // -------------------------------------------------------------
@@ -425,6 +457,217 @@ Audit complete.`;
       assert(err.message.includes('No valid JSON object structure found'));
     }
     assert.strictEqual(threw, true);
+  });
+
+  // -------------------------------------------------------------
+  // TEST GROUP 9: AUTHENTICATION & USER PROFILE RESILIENCE ENGINE
+  // -------------------------------------------------------------
+  console.log('\n--- GROUP 9: Authentication & User Profile Engine ---');
+
+  const apiRouter = require('../routes/apiRoutes');
+  const findRouteHandler = (path, method) => {
+    const layer = apiRouter.stack.find(
+      (r) => r.route && r.route.path === path && r.route.methods[method.toLowerCase()]
+    );
+    if (!layer) throw new Error(`Route ${method} ${path} not found in apiRouter`);
+    return layer.route.stack[0].handle;
+  };
+
+  await runAsyncTest('Auth signup rejects invalid email format', async () => {
+    const signupHandler = findRouteHandler('/auth/signup', 'POST');
+    let statusCode = null;
+    let resBody = null;
+    const req = { body: { email: 'invalid-email', password: 'password123' } };
+    const res = {
+      status(c) { statusCode = c; return res; },
+      json(d) { resBody = d; return res; },
+    };
+    await signupHandler(req, res);
+    assert.strictEqual(statusCode, 400);
+    assert.strictEqual(resBody.success, false);
+    assert(resBody.message.includes('valid email'));
+  });
+
+  await runAsyncTest('Auth signup rejects password shorter than 6 characters', async () => {
+    const signupHandler = findRouteHandler('/auth/signup', 'POST');
+    let statusCode = null;
+    let resBody = null;
+    const req = { body: { email: 'auditor@gaplens.org', password: '123' } };
+    const res = {
+      status(c) { statusCode = c; return res; },
+      json(d) { resBody = d; return res; },
+    };
+    await signupHandler(req, res);
+    assert.strictEqual(statusCode, 400);
+    assert.strictEqual(resBody.success, false);
+    assert(resBody.message.includes('at least 6 characters'));
+  });
+
+  await runAsyncTest('Auth me endpoint correctly validates Bearer mock token', async () => {
+    const meHandler = findRouteHandler('/auth/me', 'GET');
+    let resBody = null;
+    const req = { headers: { authorization: 'Bearer mock-jwt-token' } };
+    const res = {
+      json(d) { resBody = d; return res; },
+    };
+    await meHandler(req, res);
+    assert.strictEqual(resBody.success, true);
+    assert.strictEqual(resBody.user.id, 'usr_demo');
+  });
+
+  await runAsyncTest('Auth logout returns clean success message', async () => {
+    const logoutHandler = findRouteHandler('/auth/logout', 'POST');
+    let resBody = null;
+    const req = {};
+    const res = {
+      json(d) { resBody = d; return res; },
+    };
+    await logoutHandler(req, res);
+    assert.strictEqual(resBody.success, true);
+    assert(resBody.message.includes('Logged out'));
+  });
+
+  // -------------------------------------------------------------
+  // TEST GROUP 10: USER-LEVEL DATA ISOLATION & SESSION SCOPING
+  // -------------------------------------------------------------
+  console.log('\n--- GROUP 10: User-Level Data Isolation & Session Scoping ---');
+
+  const getSessionsHandler = findRouteHandler('/sessions', 'GET');
+  const postSessionHandler = findRouteHandler('/sessions', 'POST');
+  const patchChecklistHandler = findRouteHandler('/sessions/:id/checklist', 'PATCH');
+  const deleteSessionHandler = findRouteHandler('/sessions/:id', 'DELETE');
+
+  await runAsyncTest('Unauthenticated GET /api/sessions returns 0 sessions and prompts sign-in', async () => {
+    let resBody = null;
+    const req = { headers: {}, query: {} };
+    const res = { json(d) { resBody = d; return res; } };
+    await getSessionsHandler(req, res);
+    assert.strictEqual(resBody.success, true);
+    assert.strictEqual(resBody.count, 0);
+    assert.strictEqual(resBody.sessions.length, 0);
+    assert(resBody.message.includes('Please sign in'));
+  });
+
+  let aliceSessionId = null;
+  let bobSessionId = null;
+
+  await runAsyncTest('Create research sessions for two distinct users (Alice & Bob)', async () => {
+    // Alice session
+    const aliceReq = {
+      headers: { 'x-user-id': 'usr_alice_001' },
+      body: {
+        topic: 'Alice Scholarship Research 2026',
+        category: 'Education',
+        sources: [
+          { id: 's1', title: 'Doc 1', content: 'Official notice text for scholarship.' },
+          { id: 's2', title: 'Doc 2', content: 'Secondary guidelines for scholarship.' },
+        ],
+        analysis_result: { readinessScore: 85 },
+      },
+    };
+    let aliceRes = null;
+    await postSessionHandler(aliceReq, {
+      status() { return this; },
+      json(d) { aliceRes = d; return this; },
+    });
+    assert.strictEqual(aliceRes.success, true);
+    assert.strictEqual(aliceRes.session.user_id, 'usr_alice_001');
+    aliceSessionId = aliceRes.session.id;
+
+    // Bob session
+    const bobReq = {
+      headers: { 'x-user-id': 'usr_bob_002' },
+      body: {
+        topic: 'Bob Cloud Kitchen Licensing 2026',
+        category: 'Food Safety',
+        sources: [
+          { id: 's1', title: 'FSSAI Rule', content: 'Statutory threshold for cloud kitchen.' },
+          { id: 's2', title: 'Municipal Rule', content: 'Local health license requirement.' },
+        ],
+        analysis_result: { readinessScore: 72 },
+      },
+    };
+    let bobRes = null;
+    await postSessionHandler(bobReq, {
+      status() { return this; },
+      json(d) { bobRes = d; return this; },
+    });
+    assert.strictEqual(bobRes.success, true);
+    assert.strictEqual(bobRes.session.user_id, 'usr_bob_002');
+    bobSessionId = bobRes.session.id;
+  });
+
+  await runAsyncTest('Alice can ONLY access her own sessions, NEVER Bob\'s', async () => {
+    let aliceGetRes = null;
+    const req = { headers: { 'x-user-id': 'usr_alice_001' }, query: {} };
+    await getSessionsHandler(req, {
+      json(d) { aliceGetRes = d; return this; },
+    });
+    assert.strictEqual(aliceGetRes.success, true);
+    assert(aliceGetRes.sessions.length >= 1);
+    const aliceTopics = aliceGetRes.sessions.map((s) => s.topic);
+    assert(aliceTopics.includes('Alice Scholarship Research 2026'));
+    assert(!aliceTopics.includes('Bob Cloud Kitchen Licensing 2026'));
+  });
+
+  await runAsyncTest('Bob can ONLY access his own sessions, NEVER Alice\'s', async () => {
+    let bobGetRes = null;
+    const req = { headers: { 'x-user-id': 'usr_bob_002' }, query: {} };
+    await getSessionsHandler(req, {
+      json(d) { bobGetRes = d; return this; },
+    });
+    assert.strictEqual(bobGetRes.success, true);
+    assert(bobGetRes.sessions.length >= 1);
+    const bobTopics = bobGetRes.sessions.map((s) => s.topic);
+    assert(bobTopics.includes('Bob Cloud Kitchen Licensing 2026'));
+    assert(!bobTopics.includes('Alice Scholarship Research 2026'));
+  });
+
+  await runAsyncTest('Cross-User Security: Alice is denied modification of Bob\'s session (403)', async () => {
+    let statusCode = null;
+    let patchRes = null;
+    const req = {
+      params: { id: bobSessionId },
+      headers: { 'x-user-id': 'usr_alice_001' },
+      body: { checkedIds: ['chk-1'] },
+    };
+    await patchChecklistHandler(req, {
+      status(c) { statusCode = c; return this; },
+      json(d) { patchRes = d; return this; },
+    });
+    assert.strictEqual(statusCode, 403);
+    assert.strictEqual(patchRes.success, false);
+    assert(patchRes.message.includes('Forbidden') || patchRes.message.includes('cannot modify'));
+  });
+
+  await runAsyncTest('Cross-User Security: Alice is denied deletion of Bob\'s session (403)', async () => {
+    let statusCode = null;
+    let deleteRes = null;
+    const req = {
+      params: { id: bobSessionId },
+      headers: { 'x-user-id': 'usr_alice_001' },
+    };
+    await deleteSessionHandler(req, {
+      status(c) { statusCode = c; return this; },
+      json(d) { deleteRes = d; return this; },
+    });
+    assert.strictEqual(statusCode, 403);
+    assert.strictEqual(deleteRes.success, false);
+    assert(deleteRes.message.includes('Forbidden') || deleteRes.message.includes('cannot delete'));
+  });
+
+  await runAsyncTest('Authorized user (Bob) can successfully delete his own session', async () => {
+    let deleteRes = null;
+    const req = {
+      params: { id: bobSessionId },
+      headers: { 'x-user-id': 'usr_bob_002' },
+    };
+    await deleteSessionHandler(req, {
+      status(c) { return this; },
+      json(d) { deleteRes = d; return this; },
+    });
+    assert.strictEqual(deleteRes.success, true);
+    assert.strictEqual(deleteRes.sessionId, bobSessionId);
   });
 
   // -------------------------------------------------------------

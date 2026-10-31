@@ -234,28 +234,55 @@ function validateAndNormalizeAnalysis(analysis, fallbackData) {
     explanation: gap.explanation || gap.details || 'Not documented in provided sources.',
   }));
 
-  // Ensure each contradiction has signalLabel, source structure, and evidenceQuote
-  normalized.contradictions = normalized.contradictions.map((conf, idx) => ({
-    id: conf.id || `conf-${idx + 1}`,
-    parameter: conf.parameter || `Disputed Parameter ${idx + 1}`,
-    severity: conf.severity || 'Moderate Conflict',
-    signalLabel: conf.signalLabel || 'Possible Conflict Between Sources',
-    sourceA: {
-      sourceId: conf.sourceA?.sourceId || 'src-1',
-      title: conf.sourceA?.title || 'Source 1',
-      claim: conf.sourceA?.claim || 'Statement from Source 1',
-      evidenceQuote: conf.sourceA?.evidenceQuote || conf.sourceA?.claim || '',
-    },
-    sourceB: {
-      sourceId: conf.sourceB?.sourceId || 'src-2',
-      title: conf.sourceB?.title || 'Source 2',
-      claim: conf.sourceB?.claim || 'Conflicting statement from Source 2',
-      evidenceQuote: conf.sourceB?.evidenceQuote || conf.sourceB?.claim || '',
-    },
-    resolutionAdvice:
-      conf.resolutionAdvice ||
-      'Cross-reference with official circular or gazette notification.',
-  }));
+  // Ensure each contradiction has signalLabel, source structure, evidenceQuote, and precedenceVerdict
+  normalized.contradictions = normalized.contradictions.map((conf, idx) => {
+    const srcA = conf.sourceA?.sourceId || 'src-1';
+    const srcB = conf.sourceB?.sourceId || 'src-2';
+    const titleA = (conf.sourceA?.title || '').toLowerCase();
+    const titleB = (conf.sourceB?.title || '').toLowerCase();
+    const isOfficialA = titleA.includes('official') || titleA.includes('portal') || titleA.includes('circular') || titleA.includes('guidelines') || titleA.includes('dte') || titleA.includes('ministry') || titleA.includes('fssai');
+    const isOfficialB = titleB.includes('official') || titleB.includes('portal') || titleB.includes('circular') || titleB.includes('guidelines') || titleB.includes('dte') || titleB.includes('ministry') || titleB.includes('fssai');
+
+    const defaultBindingId = isOfficialA && !isOfficialB ? srcA : (!isOfficialA && isOfficialB ? srcB : srcA);
+    const defaultReasoning = defaultBindingId === srcA
+      ? `${conf.sourceA?.title || 'Source A'} represents authoritative regulatory guidelines (Tier 1/2) and takes legal precedence over secondary advisory claims (Tier 3/4).`
+      : `${conf.sourceB?.title || 'Source B'} represents authoritative statutory circulars (Tier 1/2) and supersedes unverified secondary guidance (Tier 3/4).`;
+
+    const verdict = conf.precedenceVerdict && typeof conf.precedenceVerdict === 'object'
+      ? {
+          bindingSourceId: conf.precedenceVerdict.bindingSourceId || defaultBindingId,
+          confidence: conf.precedenceVerdict.confidence || 'Definitive Precedence',
+          legalWeightReasoning: conf.precedenceVerdict.legalWeightReasoning || defaultReasoning,
+        }
+      : {
+          bindingSourceId: defaultBindingId,
+          confidence: 'Definitive Precedence',
+          legalWeightReasoning: defaultReasoning,
+        };
+
+    return {
+      id: conf.id || `conf-${idx + 1}`,
+      parameter: conf.parameter || `Disputed Parameter ${idx + 1}`,
+      severity: conf.severity || 'Moderate Conflict',
+      signalLabel: conf.signalLabel || 'Possible Conflict Between Sources',
+      sourceA: {
+        sourceId: srcA,
+        title: conf.sourceA?.title || 'Source 1',
+        claim: conf.sourceA?.claim || 'Statement from Source 1',
+        evidenceQuote: conf.sourceA?.evidenceQuote || conf.sourceA?.claim || '',
+      },
+      sourceB: {
+        sourceId: srcB,
+        title: conf.sourceB?.title || 'Source 2',
+        claim: conf.sourceB?.claim || 'Conflicting statement from Source 2',
+        evidenceQuote: conf.sourceB?.evidenceQuote || conf.sourceB?.claim || '',
+      },
+      resolutionAdvice:
+        conf.resolutionAdvice ||
+        'Cross-reference with official circular or gazette notification.',
+      precedenceVerdict: verdict,
+    };
+  });
 
   // Ensure each outdated warning has evidenceQuote
   normalized.outdatedWarnings = normalized.outdatedWarnings.map((warn, idx) => ({
@@ -292,6 +319,57 @@ function validateAndNormalizeAnalysis(analysis, fallbackData) {
       };
     });
   }
+
+  // Pre-Mortem Decision Risk Simulation normalization
+  const defaultPreMortem = fallbackData.decisionPreMortem || {
+    overallRiskLevel:
+      normalized.readinessScore < 50
+        ? 'Severe Risk'
+        : normalized.readinessScore < 70
+        ? 'High Risk'
+        : 'Moderate Risk',
+    estimatedDelay: '30 to 60 Days Lodgment Delay',
+    consequenceSummary:
+      'Submitting applications or executing commercial decisions under unresolved contradictory criteria creates an immediate risk of statutory rejection and delayed processing. Missing verification of mandatory prerequisites leaves irreversible compliance vulnerabilities.',
+    criticalFailurePoints: [
+      ...normalized.contradictions.slice(0, 2).map((c) => ({
+        darkSpotRef: c.id,
+        failureScenario: `Statutory disqualification caused by ${c.parameter} divergence between conflicting sources.`,
+        penaltyOrLoss:
+          'Application rejection during document nodal scrutiny, forfeiture of processing fees or filing cycle.',
+      })),
+      ...normalized.informationGaps.slice(0, 2).map((g) => ({
+        darkSpotRef: g.id,
+        failureScenario: `Non-compliance with undisclosed mandatory prerequisite: "${g.title}".`,
+        penaltyOrLoss:
+          'Indefinite administrative hold, cancellation of benefits, or exposure to retroactive regulatory penalties.',
+      })),
+    ],
+  };
+
+  const rawPreMortem = analysis.decisionPreMortem;
+  normalized.decisionPreMortem =
+    rawPreMortem && typeof rawPreMortem === 'object'
+      ? {
+          overallRiskLevel:
+            rawPreMortem.overallRiskLevel || defaultPreMortem.overallRiskLevel,
+          estimatedDelay:
+            rawPreMortem.estimatedDelay || defaultPreMortem.estimatedDelay,
+          consequenceSummary:
+            rawPreMortem.consequenceSummary || defaultPreMortem.consequenceSummary,
+          criticalFailurePoints:
+            Array.isArray(rawPreMortem.criticalFailurePoints) &&
+            rawPreMortem.criticalFailurePoints.length > 0
+              ? rawPreMortem.criticalFailurePoints.map((pt, idx) => ({
+                  darkSpotRef: pt.darkSpotRef || `gap-${idx + 1}`,
+                  failureScenario:
+                    pt.failureScenario || 'Procedural failure due to unverified regulatory prerequisite.',
+                  penaltyOrLoss:
+                    pt.penaltyOrLoss || 'Statutory rejection or delayed administrative processing.',
+                }))
+              : defaultPreMortem.criticalFailurePoints,
+        }
+      : defaultPreMortem;
 
   return normalized;
 }
@@ -387,6 +465,16 @@ RESPONSIBLE AI RULES, TRACEABILITY & GUARDRAILS:
    - Properly escape all double quotes inside string values using '\\\"' (e.g. \\\"required document\\\").
    - NEVER place unescaped raw literal newlines or control characters inside string literals; encode newlines as '\\n'.
    - All object keys and string values must use standard double quotes (\").
+6. Hierarchy of Authority (LHoA) Conflict Arbiter:
+   - For every contradiction, evaluate the evidentiary authority weight:
+     Tier 1: Statutory Acts, Gazettes & Binding Circulars
+     Tier 2: Official Department Portals & Direct Administrative Guidelines
+     Tier 3: Secondary Advisory Guides & Reputable Educational Media
+     Tier 4: Unverified Community Posts, Blogs, Forums & Crowdsourced FAQs
+   - Inside each contradiction item, provide "precedenceVerdict" with "bindingSourceId", "confidence" (Definitive Precedence | Strong Suggestion | Unresolved Parity), and "legalWeightReasoning".
+7. Pre-Mortem Decision Risk Simulator:
+   - Perform a forward-looking consequence stress test.
+   - Include top-level "decisionPreMortem" with "overallRiskLevel" (Severe Risk | High Risk | Moderate Risk), "estimatedDelay", "consequenceSummary", and "criticalFailurePoints" detailing what specifically fails if unverified.
 
 REQUIRED JSON SCHEMA:
 {
@@ -440,7 +528,12 @@ REQUIRED JSON SCHEMA:
         "claim": "<claim from B>",
         "evidenceQuote": "<exact verbatim quote from source B>"
       },
-      "resolutionAdvice": "<practical guidance on how user should verify which is legally binding>"
+      "resolutionAdvice": "<practical guidance on how user should verify which is legally binding>",
+      "precedenceVerdict": {
+        "bindingSourceId": "<src-id of the authoritative source>",
+        "confidence": "<Definitive Precedence | Strong Suggestion | Unresolved Parity>",
+        "legalWeightReasoning": "<Explain why source A overrides source B based on authority hierarchy: Official Notice/Gazette > Secondary Blog/Forum>"
+      }
     }
   ],
   "outdatedWarnings": [
@@ -462,7 +555,19 @@ REQUIRED JSON SCHEMA:
       "targetAuthority": "<exact agency or office to contact>",
       "reason": "<why this step is necessary>"
     }
-  ]
+  ],
+  "decisionPreMortem": {
+    "overallRiskLevel": "<Severe Risk | High Risk | Moderate Risk>",
+    "estimatedDelay": "<e.g. 30 to 60 Days Lodgment Delay>",
+    "consequenceSummary": "<Direct 2-sentence explanation of what happens if user submits based on currently available info>",
+    "criticalFailurePoints": [
+      {
+        "darkSpotRef": "<gap-id or conf-id>",
+        "failureScenario": "<Specific reason application/compliance will fail>",
+        "penaltyOrLoss": "<Financial loss, statutory rejection, or forfeiture>"
+      }
+    ]
+  }
 }`;
 
   // Format the user sources for the model (capped at 3,000 chars per source to avoid payload over-bloat)

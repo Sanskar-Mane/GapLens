@@ -61,7 +61,7 @@ export default function MetricCardsRow({
         return (
           <div
             key={idx}
-            className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-soft transition-all hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
+            className="rounded-2xl border border-zinc-200/90 bg-white p-5 shadow-soft transition-all hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
           >
             {/* Top row: Title on left, minimal outlined icon on right */}
             <div className="flex items-center justify-between">
@@ -74,7 +74,7 @@ export default function MetricCardsRow({
             </div>
 
             {/* Middle row: Large bold number */}
-            <div className="mt-2 text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">
+            <div className="mt-2 text-3xl sm:text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-white">
               {m.value}
             </div>
 
