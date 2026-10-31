@@ -132,3 +132,4 @@ export default function AnalysisLoadingOverlay({ activeModel, isVisible = true }
     </div>
   );
 }
+
