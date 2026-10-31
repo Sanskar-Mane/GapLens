@@ -1,0 +1,3189 @@
+Directory structure:
+└── GapLens/
+    ├── README.md
+    ├── backend/
+    │   ├── package.json
+    │   ├── server.js
+    │   ├── .env.example
+    │   ├── config/
+    │   │   └── db.js
+    │   ├── data/
+    │   │   └── sampleScenarios.js
+    │   ├── models/
+    │   │   └── ResearchSession.js
+    │   └── routes/
+    │       └── apiRoutes.js
+    └── frontend/
+        ├── index.html
+        ├── package.json
+        ├── postcss.config.js
+        ├── tailwind.config.js
+        ├── vite.config.js
+        └── src/
+            ├── App.jsx
+            ├── index.css
+            ├── main.jsx
+            ├── components/
+            │   ├── ActionFooter.jsx
+            │   ├── ApiKeyModal.jsx
+            │   ├── DashboardPreview.jsx
+            │   ├── Navbar.jsx
+            │   ├── SampleLoader.jsx
+            │   ├── SourceCard.jsx
+            │   ├── SourceCollector.jsx
+            │   └── TopicInput.jsx
+            ├── data/
+            │   └── fallbackScenarios.js
+            └── services/
+                └── api.js
+
+================================================
+FILE: README.md
+================================================
+# GapLens — AI-Assisted Information Gap Detection Platform
+**Shinchan Online Hackathon 2026** | **Problem Statement: Digital Dark Spot**
+
+GapLens is an analytical intelligence platform designed to uncover "Digital Dark Spots" in multi-source policies, academic regulations, government schemes, and business compliance documents. Instead of summarizing text, GapLens analyzes what is **missing, contradictory, or outdated**.
+
+---
+
+## 🏛️ Architecture & Highlights (Phase 0 & 1)
+
+- **Two-Folder Architecture:** `GapLens/backend` (Express, Mongoose, Jina AI & Cheerio) and `GapLens/frontend` (React JSX, Vite, Tailwind CSS, Lucide icons).
+- **Zero-Crash Resilience:** Automatic graceful fallback from MongoDB to in-memory session persistence when database is offline.
+- **Dual OpenRouter Key Integration:** Supports backend `.env` (`OPENROUTER_API_KEY`) and browser-level `localStorage` overrides with model selection (`google/gemini-2.5-flash`, `meta-llama/llama-3.3-70b-instruct:free`, `deepseek/deepseek-chat-v3-0324:free`).
+- **1-Click Judge Datasets:** Pre-seeded realistic scenarios with intentional dark spots:
+  1. *Post-Matric Scholarship Verification:* Conflicting income limits (Rs. 2.5L vs Rs. 8L), missing renewal conditions, outdated 2023 offline submission circular.
+  2. *Cloud Kitchen Licensing & Compliance:* Conflicting turnover thresholds (Rs. 10L vs Rs. 12L), missing Fire & Pollution NOCs, undated blog.
+- **Multi-Source Workspace:** Dynamic collection of 2 to 6 sources with auto URL extraction via Jina AI reader and direct HTML fallback.
+- **5-Panel Analytical Blueprint:** Visual layout for Corroborated Facts, Information Gaps (Dark Spots), Contradictions Radar, Temporal Warnings, and Prioritized Verification Checklist.
+
+---
+
+## 🚀 Quick Start Guide
+
+### 1. Start Backend (Port 5000)
+```bash
+cd GapLens/backend
+npm install
+npm start
+# Server boots on http://localhost:5000
+```
+
+### 2. Start Frontend (Port 5173)
+```bash
+cd GapLens/frontend
+npm install
+npm run dev
+# Vite runs on http://localhost:5173
+```
+
+---
+
+## 📡 Backend Endpoints
+- `GET /` — API directory and storage mode probe
+- `GET /api/health` — System health, DB status, and OpenRouter readiness
+- `GET /api/scenarios` — Pre-seeded sample scenarios
+- `POST /api/extract-url` — Automated web scraping via Jina AI with fallback
+- `POST /api/sessions` — Persists research sessions (MongoDB or In-Memory)
+- `GET /api/sessions` — Retrieves session history
+- `POST /api/analyze` — Phase 1 validation and readiness check
+
+
+
+
+================================================
+FILE: backend/package.json
+================================================
+{
+  "name": "gaplens-backend",
+  "version": "1.0.0",
+  "description": "GapLens Backend - AI-Assisted Information Gap Detection Platform (Shinchan Online Hackathon 2026: Digital Dark Spot)",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "cheerio": "^1.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mongoose": "^8.9.5"
+  }
+}
+
+
+
+
+================================================
+FILE: backend/server.js
+================================================
+Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x8d in position 2044: character maps to <undefined>
+
+
+================================================
+FILE: backend/.env.example
+================================================
+# GapLens Backend Environment Variables
+PORT=5000
+MONGO_URI=mongodb://127.0.0.1:27017/gaplens
+
+# OpenRouter API Key (Optional in backend if provided via frontend modal)
+# Get a key at: https://openrouter.ai/keys
+OPENROUTER_API_KEY=your_openrouter_key_here
+
+# Default Model Selection (e.g. google/gemini-2.5-flash, google/gemini-2.0-flash-001, meta-llama/llama-3.3-70b-instruct:free)
+OPENROUTER_MODEL=google/gemini-2.5-flash
+
+
+
+
+================================================
+FILE: backend/config/db.js
+================================================
+const mongoose = require('mongoose');
+
+let isDbConnected = false;
+const inMemorySessions = [];
+
+const connectDB = async () => {
+  const uri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/gaplens';
+  
+  try {
+    // Attempt Mongoose connection with short timeout so server boots instantly if Mongo is absent
+    const conn = await mongoose.connect(uri, {
+      serverSelectionTimeoutMS: 2500,
+    });
+    isDbConnected = true;
+    console.log(`[GapLens DB] MongoDB Connected: ${conn.connection.host}/${conn.connection.name}`);
+  } catch (error) {
+    isDbConnected = false;
+    console.warn(`[GapLens DB Warning] MongoDB offline (${error.message}) â€” running in In-Memory Fallback Mode`);
+  }
+};
+
+const getDbStatus = () => ({
+  connected: isDbConnected,
+  mode: isDbConnected ? 'MongoDB' : 'In-Memory Fallback',
+  inMemoryCount: inMemorySessions.length
+});
+
+module.exports = {
+  connectDB,
+  getDbStatus,
+  isDbConnected: () => isDbConnected,
+  inMemorySessions
+};
+
+
+
+
+================================================
+FILE: backend/data/sampleScenarios.js
+================================================
+/**
+ * Pre-seeded realistic sample datasets for GapLens
+ * Problem Statement: Digital Dark Spot (Shinchan Online Hackathon 2026)
+ *
+ * Each scenario contains deliberate real-world information defects:
+ * - Missing critical conditions (hidden prerequisites, renewal clauses)
+ * - Cross-source factual contradictions (conflicting numbers, procedures)
+ * - Outdated temporal information (stale application cycles, superseded rules)
+ * - Undated sources (triggering temporal uncertainty warnings)
+ */
+
+const sampleScenarios = [
+  {
+    id: 'scholarship-2026',
+    name: 'Post-Matric Scholarship Verification',
+    badge: 'Education & Welfare',
+    flawsSummary: 'Contradictory Income Limits + Outdated 2023 Rules + Missing Renewal Criteria',
+    category: 'Education',
+    topic: 'What should I verify before applying for the State Post-Matric Scholarship?',
+    sources: [
+      {
+        id: 'src-1',
+        title: 'Official State Scholarship Portal Guidelines',
+        sourceType: 'Official Notice',
+        url: 'https://scholarships.gov.example/post-matric-2026',
+        publishedDate: 'September 2026 (2026-27 Cycle)',
+        content:
+          'Eligibility: Applicants must be domiciled in the state and have secured at least 75% marks in the previous qualifying examination. Annual family income from all sources must not exceed Rs. 2,50,000. Required Documents: Aadhaar Card, Previous Year Marksheet, Bank Passbook copy, and Income Certificate issued by Tehsildar. Note: Applications must be submitted online via the official portal.',
+      },
+      {
+        id: 'src-2',
+        title: 'EduCareer Student Guidance Blog',
+        sourceType: 'Third-Party Guide',
+        url: 'https://educareer-guide.example/state-scholarship-details',
+        publishedDate: 'August 2026',
+        content:
+          'The State Post-Matric Scholarship supports undergraduate engineering and degree students. Students with a family income up to Rs. 8,00,000 per annum are eligible to apply. Documents required include a self-attested income declaration on a Rs. 100 stamp paper, Ration Card, Bonafide Certificate from the college principal, and Caste Validity Certificate.',
+      },
+      {
+        id: 'src-3',
+        title: 'Regional Directorate Circular Archive',
+        sourceType: 'Archived Circular',
+        url: 'https://dte-archive.example/circular-2023-24.pdf',
+        publishedDate: 'October 2023 (2023-24 Cycle)',
+        content:
+          'All eligible scholarship candidates for the 2023-24 academic cycle must submit hard copies of their application form along with original verification slips to the District Nodal Officer on or before 15th November 2023.',
+      },
+    ],
+  },
+  {
+    id: 'fssai-cloud-kitchen',
+    name: 'Cloud Kitchen Licensing & Compliance',
+    badge: 'Business & Regulatory',
+    flawsSummary: 'Conflicting Turnover Thresholds + Undated Blog Missing Fire & Pollution NOCs',
+    category: 'Business',
+    topic: 'What licenses, fire safety rules, and renewal steps are required to start a home-based cloud kitchen?',
+    sources: [
+      {
+        id: 'src-1',
+        title: 'Food Safety Authority Portal (FSSAI Basic Guidelines)',
+        sourceType: 'Official Notice',
+        url: 'https://fssai.gov.example/cloud-kitchen-standards',
+        publishedDate: 'January 2026',
+        content:
+          'Home-based food operators and cloud kitchens having an annual turnover of up to Rs. 12 Lakhs are required to obtain only a Basic FSSAI Registration Certificate (Form A). Key requirements include identity proof, kitchen layout sketch, potable water test report, and food handler medical fitness certificate. Annual renewal must be applied 30 days prior to expiry.',
+      },
+      {
+        id: 'src-2',
+        title: 'Municipal Corporation Trade Licensing Advisory',
+        sourceType: 'Third-Party Guide',
+        url: 'https://smb-advisory.example/delhi-mumbai-cloud-kitchen-rules',
+        publishedDate: 'March 2026',
+        content:
+          'All commercial food delivery establishments regardless of turnover require a Municipal Health Trade License and Shop & Establishment registration. Commercial electricity connection is mandatory. Any kitchen with power load exceeding 5KW or turnover exceeding Rs. 10 Lakhs must obtain a State FSSAI License rather than Basic Registration.',
+      },
+      {
+        id: 'src-3',
+        title: 'Cloud Kitchen Startup Digest Blog',
+        sourceType: 'Forum/Other',
+        url: 'https://cloudkitchenhustle.example/starting-from-home',
+        publishedDate: '', // Deliberately undated to trigger temporal warning
+        content:
+          'You can launch a delivery-only kitchen from your apartment instantly using aggregator platforms. No fire department NOC or pollution clearance is needed for residential kitchens with domestic LPG cylinders. Simply upload your PAN card and personal bank statement to start accepting online orders.',
+      },
+    ],
+  },
+];
+
+module.exports = sampleScenarios;
+
+
+
+
+================================================
+FILE: backend/models/ResearchSession.js
+================================================
+const mongoose = require('mongoose');
+
+const SourceItemSchema = new mongoose.Schema({
+  id: {
+    type: String,
+    required: true,
+  },
+  title: {
+    type: String,
+    default: '',
+  },
+  sourceType: {
+    type: String,
+    enum: [
+      'Official Notice',
+      'Third-Party Guide',
+      'Archived Circular',
+      'News Article',
+      'Forum/Other'
+    ],
+    default: 'Official Notice',
+  },
+  url: {
+    type: String,
+    default: '',
+  },
+  publishedDate: {
+    type: String,
+    default: '',
+  },
+  content: {
+    type: String,
+    required: true,
+  },
+}, { _id: false });
+
+const ResearchSessionSchema = new mongoose.Schema({
+  topic: {
+    type: String,
+    required: [true, 'Research topic or decision goal is required'],
+    trim: true,
+  },
+  category: {
+    type: String,
+    enum: ['Education', 'Careers', 'Public Services', 'Research', 'Business'],
+    default: 'Education',
+  },
+  sources: {
+    type: [SourceItemSchema],
+    validate: [
+      (val) => Array.isArray(val) && val.length >= 2,
+      'At least two sources are required for cross-verification analysis'
+    ],
+  },
+  modelUsed: {
+    type: String,
+    default: 'google/gemini-2.5-flash',
+  },
+  analysisResult: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
+module.exports = mongoose.model('ResearchSession', ResearchSessionSchema);
+
+
+
+
+================================================
+FILE: backend/routes/apiRoutes.js
+================================================
+const express = require('express');
+const axios = require('axios');
+const cheerio = require('cheerio');
+const sampleScenarios = require('../data/sampleScenarios');
+const ResearchSession = require('../models/ResearchSession');
+const { isDbConnected, inMemorySessions } = require('../config/db');
+
+const router = express.Router();
+
+/**
+ * GET /api/health
+ * Returns service status, database connectivity, and OpenRouter configuration
+ */
+router.get('/health', (req, res) => {
+  const dbStatus = isDbConnected();
+  const hasServerKey = Boolean(
+    process.env.OPENROUTER_API_KEY &&
+      process.env.OPENROUTER_API_KEY.trim() !== '' &&
+      process.env.OPENROUTER_API_KEY !== 'your_openrouter_key_here'
+  );
+  const defaultModel = process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash';
+
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    dbConnected: dbStatus,
+    storageMode: dbStatus ? 'MongoDB Database' : 'In-Memory Fallback',
+    hasServerOpenRouterKey: hasServerKey,
+    defaultModel,
+    appVersion: '1.0.0-phase1',
+  });
+});
+
+/**
+ * GET /api/scenarios
+ * Returns pre-seeded realistic hackathon scenarios
+ */
+router.get('/scenarios', (req, res) => {
+  res.json({
+    success: true,
+    count: sampleScenarios.length,
+    scenarios: sampleScenarios,
+  });
+});
+
+/**
+ * POST /api/extract-url
+ * Accepts { url } and fetches readable text content
+ * Uses Jina AI reader with Cheerio fallback for high-fidelity extraction
+ */
+router.post('/extract-url', async (req, res) => {
+  const { url } = req.body;
+
+  if (!url || typeof url !== 'string' || !url.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: 'A valid URL is required for content extraction.',
+    });
+  }
+
+  const cleanUrl = url.trim();
+
+  // Basic validation of URL structure
+  try {
+    new URL(cleanUrl);
+  } catch (err) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid URL format. Please include http:// or https://.',
+    });
+  }
+
+  // Attempt 1: Jina AI Reader API (produces clean markdown & preserves tables)
+  try {
+    const jinaUrl = `https://r.jina.ai/${encodeURIComponent(cleanUrl)}`;
+    const jinaResponse = await axios.get(jinaUrl, {
+      timeout: 9000,
+      headers: {
+        'User-Agent': 'GapLens-Extractor/1.0 (Hackathon Digital Dark Spot)',
+        Accept: 'text/plain, text/markdown',
+      },
+    });
+
+    if (jinaResponse.data && typeof jinaResponse.data === 'string' && jinaResponse.data.length > 50) {
+      const rawText = jinaResponse.data;
+      // Derive a quick title from the first header or the URL
+      const titleMatch = rawText.match(/^#\s+(.+)$/m) || rawText.match(/Title:\s*(.+)/i);
+      const title = titleMatch ? titleMatch[1].trim() : cleanUrl;
+
+      return res.json({
+        success: true,
+        extractedVia: 'Jina AI Reader',
+        title: title.slice(0, 120),
+        content: rawText.slice(0, 15000), // Cap reasonable payload for sources
+        extractedAt: new Date().toISOString(),
+      });
+    }
+  } catch (jinaErr) {
+    console.warn(`[Extract Warning] Jina reader fallback triggered for ${cleanUrl}: ${jinaErr.message}`);
+  }
+
+  // Attempt 2: Direct HTTP fetch + Cheerio HTML parsing
+  try {
+    const directResponse = await axios.get(cleanUrl, {
+      timeout: 8000,
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+    });
+
+    const $ = cheerio.load(directResponse.data);
+    // Remove unwanted elements
+    $('script, style, nav, footer, noscript, svg, header').remove();
+
+    const title = $('title').text().trim() || $('h1').first().text().trim() || cleanUrl;
+
+    // Collect paragraph text
+    const paragraphs = [];
+    $('article p, main p, body p').each((_, el) => {
+      const text = $(el).text().trim();
+      if (text.length > 25) {
+        paragraphs.push(text);
+      }
+    });
+
+    const combinedText = paragraphs.join('\n\n');
+
+    if (combinedText.length >= 40) {
+      return res.json({
+        success: true,
+        extractedVia: 'Direct HTML Parser',
+        title: title.slice(0, 120),
+        content: combinedText.slice(0, 15000),
+        extractedAt: new Date().toISOString(),
+      });
+    }
+  } catch (directErr) {
+    console.warn(`[Extract Warning] Direct fetch failed for ${cleanUrl}: ${directErr.message}`);
+  }
+
+  // Graceful fallback response when automated scraping fails or URL is synthetic
+  return res.status(200).json({
+    success: false,
+    message:
+      'Could not automatically scrape content from this URL (target site may require login, block scraping, or be a sample URL). You can copy & paste the raw text directly into the Source Content box below.',
+    extractedAt: new Date().toISOString(),
+  });
+});
+
+/**
+ * POST /api/sessions
+ * Saves research session with graceful fallback to in-memory store
+ */
+router.post('/sessions', async (req, res) => {
+  try {
+    const { topic, category, sources, modelUsed, analysisResult } = req.body;
+
+    if (!topic || typeof topic !== 'string' || !topic.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Topic or research goal is required.',
+      });
+    }
+
+    if (!Array.isArray(sources) || sources.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least two sources are required for cross-verification.',
+      });
+    }
+
+    const sessionData = {
+      topic: topic.trim(),
+      category: category || 'Education',
+      sources: sources.map((src, idx) => ({
+        id: src.id || `src-${idx + 1}`,
+        title: (src.title || '').trim(),
+        sourceType: src.sourceType || 'Official Notice',
+        url: (src.url || '').trim(),
+        publishedDate: (src.publishedDate || '').trim(),
+        content: (src.content || '').trim(),
+      })),
+      modelUsed: modelUsed || process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash',
+      analysisResult: analysisResult || null,
+      createdAt: new Date(),
+    };
+
+    if (isDbConnected()) {
+      const savedDoc = await ResearchSession.create(sessionData);
+      return res.status(201).json({
+        success: true,
+        storage: 'mongodb',
+        session: savedDoc,
+      });
+    } else {
+      const mockDoc = {
+        _id: `mem-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+        ...sessionData,
+      };
+      inMemorySessions.unshift(mockDoc);
+      // Keep in-memory store bounded
+      if (inMemorySessions.length > 50) {
+        inMemorySessions.pop();
+      }
+      return res.status(201).json({
+        success: true,
+        storage: 'in-memory',
+        session: mockDoc,
+      });
+    }
+  } catch (err) {
+    console.error('[Session Error]', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to save research session: ' + err.message,
+    });
+  }
+});
+
+/**
+ * GET /api/sessions
+ * Retrieves saved sessions list
+ */
+router.get('/sessions', async (req, res) => {
+  try {
+    if (isDbConnected()) {
+      const sessions = await ResearchSession.find()
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .lean();
+      return res.json({ success: true, count: sessions.length, sessions });
+    } else {
+      return res.json({
+        success: true,
+        storage: 'in-memory',
+        count: inMemorySessions.length,
+        sessions: inMemorySessions,
+      });
+    }
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve sessions: ' + err.message,
+    });
+  }
+});
+
+/**
+ * POST /api/analyze
+ * Phase 1 validation stub: Validates inputs, checks OpenRouter key availability,
+ * and sets up workspace readiness for Phase 3 deep cross-analysis.
+ */
+router.post('/analyze', async (req, res) => {
+  try {
+    const { topic, category, sources, openRouterKey, model } = req.body;
+
+    // 1. Validate Topic
+    if (!topic || typeof topic !== 'string' || !topic.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a clear research question or decision goal.',
+      });
+    }
+
+    // 2. Validate Sources (Minimum 2 with content)
+    if (!Array.isArray(sources) || sources.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Minimum 2 sources are required for cross-source gap detection.',
+      });
+    }
+
+    const validSources = sources.filter(
+      (s) => s && s.content && typeof s.content === 'string' && s.content.trim().length > 10
+    );
+
+    if (validSources.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: `At least 2 sources must contain meaningful text (found ${validSources.length} valid source${
+          validSources.length === 1 ? '' : 's'
+        }). Please fill in or paste content for your sources.`,
+      });
+    }
+
+    // 3. Check OpenRouter credentials (header, client body, or server .env)
+    const headerKey = req.headers['x-openrouter-key'];
+    const activeKey =
+      (typeof openRouterKey === 'string' && openRouterKey.trim() !== '' && openRouterKey) ||
+      (typeof headerKey === 'string' && headerKey.trim() !== '' && headerKey) ||
+      (process.env.OPENROUTER_API_KEY &&
+        process.env.OPENROUTER_API_KEY !== 'your_openrouter_key_here' &&
+        process.env.OPENROUTER_API_KEY);
+
+    const activeModel =
+      model ||
+      req.headers['x-openrouter-model'] ||
+      process.env.OPENROUTER_MODEL ||
+      'google/gemini-2.5-flash';
+
+    // 4. Calculate source statistics and warnings
+    const undatedSources = validSources.filter((s) => !s.publishedDate || !s.publishedDate.trim());
+    const totalChars = validSources.reduce((acc, s) => acc + s.content.length, 0);
+
+    return res.json({
+      success: true,
+      readyForPhase3: true,
+      message: 'Phase 1 Source Workspace validated and prepared for AI Gap Detection.',
+      validation: {
+        topic: topic.trim(),
+        category: category || 'Education',
+        totalSources: validSources.length,
+        undatedCount: undatedSources.length,
+        hasUndatedWarning: undatedSources.length > 0,
+        totalCharacters: totalChars,
+      },
+      aiConfig: {
+        hasKey: Boolean(activeKey),
+        keySource: openRouterKey ? 'client' : headerKey ? 'header' : activeKey ? 'server' : 'none',
+        activeModel,
+        mode: activeKey ? 'Live OpenRouter AI' : 'Offline Seeded Demo Mode',
+      },
+    });
+  } catch (err) {
+    console.error('[Analyze Stub Error]', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Analysis validation failed: ' + err.message,
+    });
+  }
+});
+
+module.exports = router;
+
+
+
+
+================================================
+FILE: frontend/index.html
+================================================
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236366f1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/><path d='m4.93 4.93 4.24 4.24'/><path d='m14.83 9.17 4.24-4.24'/><path d='m14.83 14.83 4.24 4.24'/><path d='m9.17 14.83-4.24 4.24'/><circle cx='12' cy='12' r='4'/></svg>" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GapLens â€” AI-Assisted Information Gap Detection Platform</title>
+    <meta name="description" content="GapLens: Uncovering Digital Dark Spots, hidden prerequisites, cross-source contradictions, and outdated rules for Shinchan Online Hackathon 2026." />
+    <!-- Modern Inter font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-slate-950 text-slate-100 antialiased min-h-screen selection:bg-indigo-500 selection:text-white">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+
+
+
+
+================================================
+FILE: frontend/package.json
+================================================
+{
+  "name": "gaplens-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "lucide-react": "^0.475.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.2",
+    "tailwindcss": "^3.4.17",
+    "vite": "^6.1.0"
+  }
+}
+
+
+
+
+================================================
+FILE: frontend/postcss.config.js
+================================================
+export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+};
+
+
+
+
+================================================
+FILE: frontend/tailwind.config.js
+================================================
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        dark: {
+          950: '#030712',
+          900: '#0b1120',
+          850: '#0f172a',
+          800: '#1e293b',
+          700: '#334155',
+        },
+      },
+      fontFamily: {
+        mono: ['JetBrains Mono', 'Fira Code', 'monospace', 'Consolas'],
+      },
+    },
+  },
+  plugins: [],
+};
+
+
+
+
+================================================
+FILE: frontend/vite.config.js
+================================================
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 5173,
+    host: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+    },
+  },
+});
+
+
+
+
+================================================
+FILE: frontend/src/App.jsx
+================================================
+import React, { useState, useEffect } from 'react';
+import Navbar from './components/Navbar';
+import ApiKeyModal from './components/ApiKeyModal';
+import SampleLoader from './components/SampleLoader';
+import TopicInput from './components/TopicInput';
+import SourceCollector from './components/SourceCollector';
+import ActionFooter from './components/ActionFooter';
+import DashboardPreview from './components/DashboardPreview';
+import {
+  checkHealth,
+  fetchScenarios,
+  saveResearchSession,
+  triggerAnalysisPrep
+} from './services/api';
+import { FALLBACK_SCENARIOS } from './data/fallbackScenarios';
+
+const DEFAULT_SOURCES = [
+  {
+    id: 'src-1',
+    title: 'Official Notification / Source A',
+    sourceType: 'Official Notice',
+    url: '',
+    publishedDate: '',
+    content: '',
+  },
+  {
+    id: 'src-2',
+    title: 'Secondary Source / Guide B',
+    sourceType: 'Third-Party Guide',
+    url: '',
+    publishedDate: '',
+    content: '',
+  },
+];
+
+export default function App() {
+  // System & API Configuration State
+  const [backendHealth, setBackendHealth] = useState(null);
+  const [scenarios, setScenarios] = useState(FALLBACK_SCENARIOS);
+  const [openRouterKey, setOpenRouterKey] = useState(
+    () => localStorage.getItem('gaplens_openrouter_key') || ''
+  );
+  const [activeModel, setActiveModel] = useState(
+    () => localStorage.getItem('gaplens_openrouter_model') || 'google/gemini-2.5-flash'
+  );
+  const [forceOfflineDemo, setForceOfflineDemo] = useState(
+    () => localStorage.getItem('gaplens_force_offline_demo') === 'true'
+  );
+  const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
+
+  // Phase 1 Workspace Input State
+  const [topic, setTopic] = useState(
+    'What should I verify before applying for the State Post-Matric Scholarship?'
+  );
+  const [category, setCategory] = useState('Education');
+  const [sources, setSources] = useState(FALLBACK_SCENARIOS[0].sources);
+  const [activeScenarioId, setActiveScenarioId] = useState(FALLBACK_SCENARIOS[0].id);
+
+  // Analysis & Validation Trigger State
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisNotice, setAnalysisNotice] = useState(null);
+  const [lastAnalysisResult, setLastAnalysisResult] = useState(null);
+
+  // 1. Check Backend Health on Mount & Periodic Interval
+  useEffect(() => {
+    let isMounted = true;
+    const fetchStatus = async () => {
+      const health = await checkHealth();
+      if (isMounted) setBackendHealth(health);
+    };
+
+    const loadScenarios = async () => {
+      const data = await fetchScenarios();
+      if (isMounted && data && data.length > 0) {
+        setScenarios(data);
+      }
+    };
+
+    fetchStatus();
+    loadScenarios();
+
+    const interval = setInterval(fetchStatus, 15000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // 2. OpenRouter Config Persistence
+  const handleSaveConfig = (key, model) => {
+    setOpenRouterKey(key);
+    setActiveModel(model);
+    localStorage.setItem('gaplens_openrouter_key', key);
+    localStorage.setItem('gaplens_openrouter_model', model);
+  };
+
+  const handleToggleForceDemo = (checked) => {
+    setForceOfflineDemo(checked);
+    localStorage.setItem('gaplens_force_offline_demo', checked ? 'true' : 'false');
+  };
+
+  // 3. 1-Click Preset Scenario Loader
+  const handleSelectScenario = (scenario) => {
+    setActiveScenarioId(scenario.id);
+    setTopic(scenario.topic);
+    setCategory(scenario.category || 'Education');
+    setSources(
+      scenario.sources.map((s, idx) => ({
+        ...s,
+        id: s.id || `src-${idx + 1}`,
+      }))
+    );
+    setAnalysisNotice({
+      type: 'success',
+      title: `Loaded Preset: ${scenario.name}`,
+      message: `Scenario populated with ${scenario.sources.length} sources containing intentional flaws (${scenario.flawsSummary || 'Contradictions & Gaps'}).`,
+    });
+    setTimeout(() => setAnalysisNotice(null), 5000);
+  };
+
+  // 4. Source Management Handlers (2 to 6 sources)
+  const handleAddSource = () => {
+    if (sources.length >= 6) return;
+    const newId = `src-${Date.now().toString(36)}`;
+    const newSource = {
+      id: newId,
+      title: `Source ${sources.length + 1}`,
+      sourceType: 'Third-Party Guide',
+      url: '',
+      publishedDate: '',
+      content: '',
+    };
+    setSources([...sources, newSource]);
+  };
+
+  const handleUpdateSource = (sourceId, fields) => {
+    setSources((prev) =>
+      prev.map((s) => (s.id === sourceId ? { ...s, ...fields } : s))
+    );
+  };
+
+  const handleDeleteSource = (sourceId) => {
+    if (sources.length <= 2) return;
+    setSources((prev) => prev.filter((s) => s.id !== sourceId));
+  };
+
+  // 5. Reset Workspace Handler
+  const handleResetWorkspace = () => {
+    if (window.confirm('Reset the workspace and clear all current sources?')) {
+      setTopic('');
+      setCategory('Education');
+      setSources([
+        {
+          id: 'src-1',
+          title: '',
+          sourceType: 'Official Notice',
+          url: '',
+          publishedDate: '',
+          content: '',
+        },
+        {
+          id: 'src-2',
+          title: '',
+          sourceType: 'Third-Party Guide',
+          url: '',
+          publishedDate: '',
+          content: '',
+        },
+      ]);
+      setActiveScenarioId(null);
+      setAnalysisNotice(null);
+      setLastAnalysisResult(null);
+    }
+  };
+
+  // 6. Primary Action: Validate & Trigger Phase 1 Preparation
+  const handleTriggerAnalysis = async () => {
+    setIsAnalyzing(true);
+    setAnalysisNotice(null);
+
+    const payload = {
+      topic,
+      category,
+      sources,
+      openRouterKey: forceOfflineDemo ? '' : openRouterKey,
+      model: activeModel,
+    };
+
+    try {
+      // Step A: Call validation stub
+      const valResult = await triggerAnalysisPrep(payload);
+
+      if (valResult.success) {
+        // Step B: Save session to database or in-memory
+        const saveResult = await saveResearchSession({
+          topic,
+          category,
+          sources,
+          modelUsed: activeModel,
+        });
+
+        setLastAnalysisResult(valResult);
+        setAnalysisNotice({
+          type: 'success',
+          title: 'Phase 1 Inputs Validated & Synchronized',
+          message: `${valResult.validation?.totalSources} sources verified (${valResult.validation?.totalCharacters} chars). Saved via ${saveResult.storage || 'Storage Engine'} on session ID ${saveResult.session?._id || 'local'}. Ready for Phase 3 deep AI cross-examination.`,
+        });
+      } else {
+        setAnalysisNotice({
+          type: 'error',
+          title: 'Validation Blocked',
+          message: valResult.message || 'Please check your inputs and try again.',
+        });
+      }
+    } catch (err) {
+      setAnalysisNotice({
+        type: 'error',
+        title: 'Execution Error',
+        message: err.message || 'Failed to complete Phase 1 validation.',
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white bg-grid-pattern">
+      
+      {/* Top Navigation Bar */}
+      <Navbar
+        backendHealth={backendHealth}
+        hasOpenRouterKey={Boolean(openRouterKey || backendHealth?.data?.hasServerOpenRouterKey)}
+        activeModel={activeModel}
+        onOpenKeyModal={() => setIsKeyModalOpen(true)}
+        onResetWorkspace={handleResetWorkspace}
+        forceOfflineDemo={forceOfflineDemo}
+      />
+
+      {/* Main Container */}
+      <main className="flex-1 mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-6">
+        
+        {/* Quick-Load Demo Scenarios for Hackathon Judges */}
+        <SampleLoader
+          scenarios={scenarios}
+          onSelectScenario={handleSelectScenario}
+          activeScenarioId={activeScenarioId}
+        />
+
+        {/* Section 1: Research Question & Decision Goal Input */}
+        <TopicInput
+          topic={topic}
+          onTopicChange={setTopic}
+          category={category}
+          onCategoryChange={setCategory}
+        />
+
+        {/* Section 2: Multi-Source Collector & Card Workspace */}
+        <SourceCollector
+          sources={sources}
+          onAddSource={handleAddSource}
+          onUpdateSource={handleUpdateSource}
+          onDeleteSource={handleDeleteSource}
+        />
+
+        {/* Section 3: Live Validation & Action Footer */}
+        <ActionFooter
+          topic={topic}
+          sources={sources}
+          activeModel={activeModel}
+          hasOpenRouterKey={Boolean(openRouterKey || backendHealth?.data?.hasServerOpenRouterKey)}
+          forceOfflineDemo={forceOfflineDemo}
+          isAnalyzing={isAnalyzing}
+          onTriggerAnalysis={handleTriggerAnalysis}
+          analysisNotice={analysisNotice}
+        />
+
+        {/* Section 4: Visual Blueprint of the 5 Expected Output Panels */}
+        <DashboardPreview lastAnalysisResult={lastAnalysisResult} />
+
+      </main>
+
+      {/* Footer info */}
+      <footer className="border-t border-slate-900 bg-slate-950 py-6 text-center text-xs text-slate-500">
+        <div className="mx-auto max-w-7xl px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <div>
+            <strong className="text-slate-400">GapLens</strong> &bull; AI-Assisted Information Gap Detection Platform
+          </div>
+          <div className="text-slate-400">
+            Shinchan Online Hackathon 2026 &bull; Problem Statement: <span className="text-indigo-400 font-medium">Digital Dark Spot</span>
+          </div>
+        </div>
+      </footer>
+
+      {/* OpenRouter API Key & Model Configuration Modal */}
+      <ApiKeyModal
+        isOpen={isKeyModalOpen}
+        onClose={() => setIsKeyModalOpen(false)}
+        currentKey={openRouterKey}
+        currentModel={activeModel}
+        onSaveConfig={handleSaveConfig}
+        backendHasKey={Boolean(backendHealth?.data?.hasServerOpenRouterKey)}
+        forceOfflineDemo={forceOfflineDemo}
+        onToggleForceDemo={handleToggleForceDemo}
+      />
+
+    </div>
+  );
+}
+
+
+
+
+================================================
+FILE: frontend/src/index.css
+================================================
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #020617; /* slate-950 */
+    color: #f1f5f9; /* slate-100 */
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+}
+
+/* Custom subtle analytical background grid */
+.bg-grid-pattern {
+  background-image: radial-gradient(rgba(99, 102, 241, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Custom sleek scrollbar for source content and lists */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #090d16;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+
+
+
+================================================
+FILE: frontend/src/main.jsx
+================================================
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App.jsx';
+import './index.css';
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);
+
+
+
+
+================================================
+FILE: frontend/src/components/ActionFooter.jsx
+================================================
+import React from 'react';
+import {
+  Sparkles,
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
+  Cpu,
+  Loader2,
+  ShieldCheck,
+  ArrowRight,
+  Flame
+} from 'lucide-react';
+
+export default function ActionFooter({
+  topic,
+  sources,
+  activeModel,
+  hasOpenRouterKey,
+  forceOfflineDemo,
+  isAnalyzing,
+  onTriggerAnalysis,
+  analysisNotice
+}) {
+  const isTopicValid = Boolean(topic && topic.trim().length >= 8);
+  const validSources = sources.filter(
+    (s) => s.content && s.content.trim().length >= 10
+  );
+  const hasEnoughSources = validSources.length >= 2;
+  const undatedSources = validSources.filter(
+    (s) => !s.publishedDate || !s.publishedDate.trim()
+  );
+  const hasUndatedWarning = undatedSources.length > 0;
+
+  const isFormValid = isTopicValid && hasEnoughSources;
+
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/95 p-5 shadow-2xl backdrop-blur-md sm:p-6">
+      
+      {/* Top Bar: Live Validation Checklist */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between border-b border-slate-800 pb-4">
+        
+        {/* Validation Badges */}
+        <div className="flex flex-wrap items-center gap-2">
+          
+          {/* Topic check */}
+          <span
+            className={`inline-flex items-center space-x-1.5 rounded-lg px-2.5 py-1 text-xs font-medium ring-1 ${
+              isTopicValid
+                ? 'bg-emerald-950/50 text-emerald-300 ring-emerald-800/60'
+                : 'bg-rose-950/50 text-rose-300 ring-rose-800/60'
+            }`}
+          >
+            {isTopicValid ? (
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+            ) : (
+              <AlertTriangle className="h-3.5 w-3.5 text-rose-400" />
+            )}
+            <span>{isTopicValid ? 'Topic Specified' : 'Missing Research Goal'}</span>
+          </span>
+
+          {/* Sources count check */}
+          <span
+            className={`inline-flex items-center space-x-1.5 rounded-lg px-2.5 py-1 text-xs font-medium ring-1 ${
+              hasEnoughSources
+                ? 'bg-emerald-950/50 text-emerald-300 ring-emerald-800/60'
+                : 'bg-amber-950/50 text-amber-300 ring-amber-800/60'
+            }`}
+          >
+            {hasEnoughSources ? (
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+            ) : (
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
+            )}
+            <span>
+              {validSources.length} of 2 required sources loaded
+            </span>
+          </span>
+
+          {/* Undated Temporal check */}
+          {hasUndatedWarning && (
+            <span className="inline-flex items-center space-x-1.5 rounded-lg bg-amber-950/40 px-2.5 py-1 text-xs font-medium text-amber-300 ring-1 ring-amber-800/60">
+              <Clock className="h-3.5 w-3.5 text-amber-400" />
+              <span>{undatedSources.length} Undated source â€” will trigger Temporal Uncertainty check</span>
+            </span>
+          )}
+
+        </div>
+
+        {/* AI Engine Status Pill */}
+        <div className="flex items-center space-x-2 text-xs text-slate-400">
+          <Cpu className="h-4 w-4 text-indigo-400" />
+          <span>Active Engine:</span>
+          <span className="font-mono text-indigo-300 font-semibold bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+            {activeModel || 'google/gemini-2.5-flash'}
+          </span>
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+              forceOfflineDemo
+                ? 'bg-amber-950 text-amber-300 border border-amber-800'
+                : hasOpenRouterKey
+                ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                : 'bg-indigo-950 text-indigo-300 border border-indigo-800'
+            }`}
+          >
+            {forceOfflineDemo ? 'Demo Mode' : hasOpenRouterKey ? 'Live AI' : 'Seeded'}
+          </span>
+        </div>
+
+      </div>
+
+      {/* Notice / Feedback Banner if analysis was clicked */}
+      {analysisNotice && (
+        <div
+          className={`mt-4 rounded-xl p-3 text-xs ring-1 ${
+            analysisNotice.type === 'success'
+              ? 'bg-emerald-950/50 text-emerald-300 ring-emerald-800'
+              : 'bg-rose-950/50 text-rose-300 ring-rose-800'
+          }`}
+        >
+          <div className="flex items-start space-x-2">
+            {analysisNotice.type === 'success' ? (
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
+            ) : (
+              <AlertTriangle className="h-4 w-4 shrink-0 text-rose-400 mt-0.5" />
+            )}
+            <div>
+              <div className="font-semibold">{analysisNotice.title}</div>
+              <div className="mt-0.5 text-[11px] opacity-90">{analysisNotice.message}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Execution Bar */}
+      <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        
+        <div className="text-xs text-slate-400">
+          <p className="font-medium text-slate-300">
+            Phase 1 Input Validation Ready
+          </p>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            Cross-compares text, identifies conflicting criteria, and structures information dark spots.
+          </p>
+        </div>
+
+        {/* Primary CTA Button */}
+        <button
+          type="button"
+          disabled={!isFormValid || isAnalyzing}
+          onClick={onTriggerAnalysis}
+          className={`inline-flex items-center justify-center space-x-2.5 rounded-xl px-6 py-3.5 text-sm font-bold text-white shadow-xl transition-all ${
+            !isFormValid || isAnalyzing
+              ? 'cursor-not-allowed bg-slate-800 text-slate-500'
+              : 'bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 shadow-indigo-600/30 hover:shadow-indigo-500/50 hover:scale-[1.01] active:scale-[0.99]'
+          }`}
+        >
+          {isAnalyzing ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin text-white" />
+              <span>Cross-Examining Sources...</span>
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-4 w-4 text-indigo-200" />
+              <span>Detect Information Gaps</span>
+              <ArrowRight className="h-4 w-4 text-indigo-200" />
+            </>
+          )}
+        </button>
+
+      </div>
+
+    </div>
+  );
+}
+
+
+
+
+================================================
+FILE: frontend/src/components/ApiKeyModal.jsx
+================================================
+import React, { useState, useEffect } from 'react';
+import {
+  X,
+  KeyRound,
+  CheckCircle2,
+  AlertTriangle,
+  ExternalLink,
+  ShieldAlert,
+  Loader2,
+  Trash2,
+  Sparkles,
+  Eye,
+  EyeOff,
+  Cpu
+} from 'lucide-react';
+import { probeOpenRouter } from '../services/api';
+
+const MODEL_OPTIONS = [
+  {
+    id: 'google/gemini-2.5-flash',
+    name: 'Gemini 2.5 Flash',
+    tier: 'Recommended',
+    description: 'Fastest reasoning & high-precision gap/contradiction detection (Default)',
+  },
+  {
+    id: 'google/gemini-2.0-flash-001',
+    name: 'Gemini 2.0 Flash 001',
+    tier: 'High Speed',
+    description: 'Optimized for high-speed structured JSON output parsing',
+  },
+  {
+    id: 'meta-llama/llama-3.3-70b-instruct:free',
+    name: 'Llama 3.3 70B Instruct (Free)',
+    tier: 'Free Tier',
+    description: 'OpenRouter Free Tier option with zero token cost',
+  },
+  {
+    id: 'deepseek/deepseek-chat-v3-0324:free',
+    name: 'DeepSeek Chat v3 (Free)',
+    tier: 'Free Tier',
+    description: 'Free tier high-accuracy analytical reasoning model',
+  },
+];
+
+export default function ApiKeyModal({
+  isOpen,
+  onClose,
+  currentKey,
+  currentModel,
+  onSaveConfig,
+  backendHasKey,
+  forceOfflineDemo,
+  onToggleForceDemo
+}) {
+  const [apiKey, setApiKey] = useState(currentKey || '');
+  const [selectedModel, setSelectedModel] = useState(currentModel || 'google/gemini-2.5-flash');
+  const [showKey, setShowKey] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [saveToast, setSaveToast] = useState(false);
+
+  useEffect(() => {
+    setApiKey(currentKey || '');
+    setSelectedModel(currentModel || 'google/gemini-2.5-flash');
+    setTestResult(null);
+  }, [currentKey, currentModel, isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleSave = () => {
+    onSaveConfig(apiKey.trim(), selectedModel);
+    setSaveToast(true);
+    setTimeout(() => {
+      setSaveToast(false);
+      onClose();
+    }, 900);
+  };
+
+  const handleClear = () => {
+    setApiKey('');
+    setTestResult(null);
+    onSaveConfig('', selectedModel);
+  };
+
+  const handleTestKey = async () => {
+    const keyToTest = apiKey.trim();
+    if (!keyToTest) {
+      setTestResult({
+        success: false,
+        message: 'Please paste a valid OpenRouter API key first (starts with sk-or-v1-...).',
+      });
+      return;
+    }
+
+    setTesting(true);
+    setTestResult(null);
+
+    const result = await probeOpenRouter(keyToTest, selectedModel);
+    setTesting(false);
+    setTestResult(result);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-xl rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl ring-1 ring-white/10 sm:p-7">
+        
+        {/* Modal Header */}
+        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div className="flex items-center space-x-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-950 text-indigo-400 ring-1 ring-indigo-800">
+              <KeyRound className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-white">OpenRouter AI Configuration</h2>
+              <p className="text-xs text-slate-400">
+                Manage live API keys and AI reasoning models for GapLens
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <div className="mt-5 space-y-5">
+          
+          {/* Backend Status Callout */}
+          {backendHasKey ? (
+            <div className="flex items-start space-x-2.5 rounded-lg bg-emerald-950/50 p-3 ring-1 ring-emerald-800/60 text-xs text-emerald-300">
+              <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-emerald-400" />
+              <div>
+                <span className="font-semibold">Backend `.env` key detected:</span> The server has an active OpenRouter key configured. Any client key provided below will override it for this browser session.
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-start space-x-2.5 rounded-lg bg-slate-800/60 p-3 ring-1 ring-slate-700/60 text-xs text-slate-300">
+              <Sparkles className="h-4 w-4 mt-0.5 shrink-0 text-indigo-400" />
+              <div>
+                Provide your OpenRouter key below for live analysis, or use the pre-seeded <span className="text-indigo-300 font-semibold">Offline Demo Mode</span> for zero-setup evaluation.
+              </div>
+            </div>
+          )}
+
+          {/* API Key Input */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                OpenRouter API Key
+                <span className="text-[11px] font-normal text-slate-500 lowercase">(starts with sk-or-v1-...)</span>
+              </label>
+              <a
+                href="https://openrouter.ai/keys"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center space-x-1 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+              >
+                <span>Get a key</span>
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+
+            <div className="relative">
+              <input
+                type={showKey ? 'text' : 'password'}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="sk-or-v1-..."
+                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3.5 py-2.5 pr-20 text-sm font-mono text-slate-100 placeholder-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+              <div className="absolute inset-y-0 right-2 flex items-center space-x-1">
+                <button
+                  type="button"
+                  onClick={() => setShowKey(!showKey)}
+                  className="rounded p-1 text-slate-400 hover:text-slate-200"
+                  title={showKey ? 'Hide key' : 'Show key'}
+                >
+                  {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+                {apiKey && (
+                  <button
+                    type="button"
+                    onClick={handleClear}
+                    className="rounded p-1 text-rose-400 hover:text-rose-300"
+                    title="Clear key"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+            <p className="mt-1 text-[11px] text-slate-500">
+              Keys are stored solely in your browser's <code className="text-slate-400">localStorage</code> and transmitted securely in headers.
+            </p>
+          </div>
+
+          {/* Model Selector Dropdown */}
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5 flex items-center gap-1.5">
+              <Cpu className="h-3.5 w-3.5 text-indigo-400" />
+              AI Reasoning Model
+            </label>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {MODEL_OPTIONS.map((m) => {
+                const isSelected = selectedModel === m.id;
+                return (
+                  <div
+                    key={m.id}
+                    onClick={() => setSelectedModel(m.id)}
+                    className={`cursor-pointer rounded-xl border p-3 transition-all ${
+                      isSelected
+                        ? 'border-indigo-500 bg-indigo-950/40 shadow-sm shadow-indigo-500/20 ring-1 ring-indigo-500/50'
+                        : 'border-slate-800 bg-slate-950/60 hover:border-slate-700 hover:bg-slate-950'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs font-bold text-slate-200">{m.name}</div>
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                          m.tier === 'Recommended'
+                            ? 'bg-indigo-950 text-indigo-300 border border-indigo-800'
+                            : m.tier === 'Free Tier'
+                            ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}
+                      >
+                        {m.tier}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-slate-400 leading-snug">{m.description}</p>
+                    <div className="mt-1.5 text-[10px] font-mono text-slate-500 truncate">
+                      {m.id}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Force Offline Demo Mode Toggle */}
+          <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/70 p-3.5">
+            <div className="pr-4">
+              <div className="text-xs font-semibold text-slate-200">Force Offline Demo Mode</div>
+              <div className="text-[11px] text-slate-400">
+                Run zero-cost instant demonstrations with pre-analyzed verification patterns.
+              </div>
+            </div>
+            <label className="relative inline-flex cursor-pointer items-center">
+              <input
+                type="checkbox"
+                checked={forceOfflineDemo}
+                onChange={(e) => onToggleForceDemo(e.target.checked)}
+                className="peer sr-only"
+              />
+              <div className="h-6 w-11 rounded-full bg-slate-700 peer-checked:bg-indigo-600 peer-focus:outline-none after:absolute after:top-0.5 after:left-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full"></div>
+            </label>
+          </div>
+
+          {/* Test Connection Results */}
+          {testResult && (
+            <div
+              className={`rounded-xl p-3 text-xs ring-1 ${
+                testResult.success
+                  ? 'bg-emerald-950/60 text-emerald-300 ring-emerald-700/60'
+                  : 'bg-rose-950/60 text-rose-300 ring-rose-700/60'
+              }`}
+            >
+              <div className="flex items-center space-x-2 font-semibold">
+                {testResult.success ? (
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-rose-400" />
+                )}
+                <span>{testResult.success ? 'API Connection Verified!' : 'Connection Check Failed'}</span>
+              </div>
+              <p className="mt-1 text-[11px] opacity-90">
+                {testResult.reply || testResult.message}
+              </p>
+            </div>
+          )}
+
+        </div>
+
+        {/* Modal Footer Actions */}
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 pt-4">
+          <button
+            type="button"
+            onClick={handleTestKey}
+            disabled={testing || !apiKey}
+            className="inline-flex items-center space-x-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-750 disabled:opacity-50 transition-colors"
+          >
+            {testing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-400" />
+            ) : (
+              <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+            )}
+            <span>{testing ? 'Testing...' : 'Test Key with OpenRouter'}</span>
+          </button>
+
+          <div className="flex items-center space-x-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg px-3 py-2 text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="inline-flex items-center space-x-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 transition-colors"
+            >
+              {saveToast ? (
+                <>
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span>Saved!</span>
+                </>
+              ) : (
+                <span>Save Settings</span>
+              )}
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+
+
+
+================================================
+FILE: frontend/src/components/DashboardPreview.jsx
+================================================
+import React, { useState } from 'react';
+import {
+  FileText,
+  AlertTriangle,
+  GitCompare,
+  CalendarClock,
+  ListChecks,
+  ShieldCheck,
+  Eye,
+  Info,
+  Sparkles,
+  ExternalLink,
+  ChevronRight,
+  Clock,
+  CheckCircle2,
+  HelpCircle
+} from 'lucide-react';
+
+export default function DashboardPreview({ lastAnalysisResult }) {
+  const [showSimulatedData, setShowSimulatedData] = useState(false);
+
+  return (
+    <div className="space-y-6 pt-6 border-t border-slate-800">
+      
+      {/* Section Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center space-x-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-600/30 text-indigo-400 ring-1 ring-indigo-500/50">
+              <Eye className="h-3.5 w-3.5" />
+            </span>
+            <h2 className="text-base font-bold text-white tracking-tight">
+              3. GapLens Analytical Output Blueprint (5 Target Panels)
+            </h2>
+          </div>
+          <p className="mt-0.5 text-xs text-slate-400">
+            Phase 0 & 1 Architecture blueprint defining the multi-faceted gap detection pipeline.
+          </p>
+        </div>
+
+        {/* Toggle Sample Simulation for Judges */}
+        <button
+          type="button"
+          onClick={() => setShowSimulatedData(!showSimulatedData)}
+          className={`inline-flex items-center space-x-2 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+            showSimulatedData
+              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+              : 'border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800'
+          }`}
+        >
+          <Sparkles className="h-3.5 w-3.5 text-indigo-300" />
+          <span>{showSimulatedData ? 'Showing Blueprint Wireframe' : 'Preview Phase 3 Output Schema'}</span>
+        </button>
+      </div>
+
+      {/* Mandatory Transparency Disclaimer Banner */}
+      <div className="flex items-start space-x-3 rounded-2xl border border-indigo-900/60 bg-gradient-to-r from-indigo-950/40 via-slate-900 to-indigo-950/40 p-4 ring-1 ring-indigo-500/20">
+        <ShieldCheck className="h-5 w-5 text-indigo-400 shrink-0 mt-0.5" />
+        <div className="text-xs text-slate-300 space-y-0.5">
+          <div className="font-bold text-white flex items-center gap-1.5">
+            <span>Anti-Hallucination & Transparency Standard</span>
+            <span className="rounded bg-indigo-900/80 px-1.5 py-0.2 text-[10px] text-indigo-300 font-mono">
+              Digital Dark Spot Rule
+            </span>
+          </div>
+          <p className="text-slate-400 leading-relaxed">
+            GapLens strictly distinguishes <strong className="text-emerald-400">direct source facts</strong> from{' '}
+            <strong className="text-amber-400">AI-detected gap signals</strong>. We never invent missing policies or generate phantom prerequisites. Always verify critical requirements with official authorities.
+          </p>
+        </div>
+      </div>
+
+      {/* 5 Expected Output Panels Grid */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        
+        {/* Panel 1: Sourced Facts */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-lg relative overflow-hidden">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center space-x-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-950 text-emerald-400 ring-1 ring-emerald-800">
+                <FileText className="h-4 w-4" />
+              </span>
+              <div>
+                <h3 className="text-sm font-bold text-white">Panel 1: Structured Cross-Source Summary</h3>
+                <span className="text-[10px] text-emerald-400 font-medium">Extracted & Corroborated Direct Facts</span>
+              </div>
+            </div>
+            <span className="rounded bg-emerald-950/80 px-2 py-0.5 text-[10px] font-mono text-emerald-300 border border-emerald-800/60">
+              Corroboration
+            </span>
+          </div>
+
+          <div className="mt-4">
+            {showSimulatedData ? (
+              <div className="space-y-2 text-xs">
+                <div className="rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-3">
+                  <div className="font-semibold text-emerald-300 flex items-center justify-between">
+                    <span>Aadhaar & Bank Passbook Mandate</span>
+                    <span className="text-[10px] font-mono text-slate-400">[Source 1, Source 2]</span>
+                  </div>
+                  <p className="mt-1 text-slate-300 text-[11px]">
+                    All sources agree that valid government identity proof (Aadhaar) and active bank accounts in the student's name are mandatory.
+                  </p>
+                </div>
+                <div className="rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-3">
+                  <div className="font-semibold text-emerald-300 flex items-center justify-between">
+                    <span>Degree & Engineering Scope</span>
+                    <span className="text-[10px] font-mono text-slate-400">[Source 1, Source 2]</span>
+                  </div>
+                  <p className="mt-1 text-slate-300 text-[11px]">
+                    Post-Matric scheme coverage applies to post-secondary vocational, degree, and engineering cohorts.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-800 bg-slate-950/40 p-6 text-center">
+                <FileText className="h-8 w-8 text-slate-600 mb-2" />
+                <div className="text-xs font-semibold text-slate-300">Corroborated Facts Reservoir</div>
+                <p className="mt-1 text-[11px] text-slate-500 max-w-xs">
+                  Populates in Phase 3 by extracting facts verified across multiple input documents with explicit citation anchors.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Panel 2: Information Gaps & Unanswered Questions */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-lg relative overflow-hidden">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center space-x-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-950 text-amber-400 ring-1 ring-amber-800">
+                <AlertTriangle className="h-4 w-4" />
+              </span>
+              <div>
+                <h3 className="text-sm font-bold text-white">Panel 2: Potential Information Gaps</h3>
+                <span className="text-[10px] text-amber-400 font-medium">Dark Spots & Unanswered Questions</span>
+              </div>
+            </div>
+            <span className="rounded bg-amber-950/80 px-2 py-0.5 text-[10px] font-mono text-amber-300 border border-amber-800/60">
+              Dark Spot Radar
+            </span>
+          </div>
+
+          <div className="mt-4">
+            {showSimulatedData ? (
+              <div className="space-y-2 text-xs">
+                <div className="rounded-xl border border-amber-900/40 bg-amber-950/20 p-3">
+                  <div className="font-semibold text-amber-300 flex items-center justify-between">
+                    <span>Renewal & Year-2 Progression Criteria</span>
+                    <span className="text-[10px] font-mono text-amber-400">CRITICAL GAP</span>
+                  </div>
+                  <p className="mt-1 text-slate-300 text-[11px]">
+                    None of the 3 sources mention minimum attendance percentage or CGPA required to retain the scholarship in subsequent academic years.
+                  </p>
+                </div>
+                <div className="rounded-xl border border-amber-900/40 bg-amber-950/20 p-3">
+                  <div className="font-semibold text-amber-300 flex items-center justify-between">
+                    <span>Portal Closing Cutoff Deadline</span>
+                    <span className="text-[10px] font-mono text-amber-400">OMITTED FACT</span>
+                  </div>
+                  <p className="mt-1 text-slate-300 text-[11px]">
+                    Source 1 mentions online submission but omits the final application closing date for the 2026-27 cycle.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-800 bg-slate-950/40 p-6 text-center">
+                <AlertTriangle className="h-8 w-8 text-slate-600 mb-2" />
+                <div className="text-xs font-semibold text-slate-300">Dark Spot Detector</div>
+                <p className="mt-1 text-[11px] text-slate-500 max-w-xs">
+                  Surfaces omitted policies, hidden costs, renewal prerequisites, and unstated submission deadlines.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Panel 3: Source Contradiction & Conflict Radar */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-lg relative overflow-hidden">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center space-x-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-950 text-rose-400 ring-1 ring-rose-800">
+                <GitCompare className="h-4 w-4" />
+              </span>
+              <div>
+                <h3 className="text-sm font-bold text-white">Panel 3: Contradiction & Conflict Radar</h3>
+                <span className="text-[10px] text-rose-400 font-medium">Direct Cross-Source Conflicts</span>
+              </div>
+            </div>
+            <span className="rounded bg-rose-950/80 px-2 py-0.5 text-[10px] font-mono text-rose-300 border border-rose-800/60">
+              Conflict Engine
+            </span>
+          </div>
+
+          <div className="mt-4">
+            {showSimulatedData ? (
+              <div className="space-y-2 text-xs">
+                <div className="rounded-xl border border-rose-900/40 bg-rose-950/20 p-3">
+                  <div className="font-semibold text-rose-300">
+                    Conflict: Family Income Eligibility Ceiling
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+                    <div className="rounded bg-slate-950 p-2 border border-slate-800">
+                      <span className="font-mono text-indigo-400 font-bold">[Source 1]:</span> Rs. 2,50,000 maximum annual income limit.
+                    </div>
+                    <div className="rounded bg-slate-950 p-2 border border-slate-800">
+                      <span className="font-mono text-rose-400 font-bold">[Source 2]:</span> Claims limit is up to Rs. 8,00,000.
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-rose-900/40 bg-rose-950/20 p-3">
+                  <div className="font-semibold text-rose-300">
+                    Conflict: Income Proof Format
+                  </div>
+                  <p className="mt-1 text-slate-300 text-[11px]">
+                    Tehsildar certificate required by Official Notice vs Self-attested Rs. 100 Stamp Paper stated in third-party blog.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-800 bg-slate-950/40 p-6 text-center">
+                <GitCompare className="h-8 w-8 text-slate-600 mb-2" />
+                <div className="text-xs font-semibold text-slate-300">Source Conflict Matrix</div>
+                <p className="mt-1 text-[11px] text-slate-500 max-w-xs">
+                  Pinpoints conflicting numerical criteria, diverging eligibility thresholds, and incompatible instructions across inputs.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Panel 4: Outdated & Undated Source Warnings */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-lg relative overflow-hidden">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center space-x-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-950 text-purple-400 ring-1 ring-purple-800">
+                <CalendarClock className="h-4 w-4" />
+              </span>
+              <div>
+                <h3 className="text-sm font-bold text-white">Panel 4: Temporal & Outdated Warnings</h3>
+                <span className="text-[10px] text-purple-400 font-medium">Stale Cycles & Temporal Drift</span>
+              </div>
+            </div>
+            <span className="rounded bg-purple-950/80 px-2 py-0.5 text-[10px] font-mono text-purple-300 border border-purple-800/60">
+              Temporal Radar
+            </span>
+          </div>
+
+          <div className="mt-4">
+            {showSimulatedData ? (
+              <div className="space-y-2 text-xs">
+                <div className="rounded-xl border border-purple-900/40 bg-purple-950/20 p-3">
+                  <div className="font-semibold text-purple-300 flex items-center justify-between">
+                    <span>Archived 2023-24 Circular Superseded</span>
+                    <span className="text-[10px] font-mono text-purple-400">[Source 3]</span>
+                  </div>
+                  <p className="mt-1 text-slate-300 text-[11px]">
+                    Source 3 mandates in-person submission to District Nodal Officer by Nov 2023. This is an outdated historical cycle superseded by 2026 digital portal workflow.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-800 bg-slate-950/40 p-6 text-center">
+                <CalendarClock className="h-8 w-8 text-slate-600 mb-2" />
+                <div className="text-xs font-semibold text-slate-300">Temporal Staleness Detector</div>
+                <p className="mt-1 text-[11px] text-slate-500 max-w-xs">
+                  Flags obsolete application windows, legacy offline procedures, and unverified undated guides.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+      </div>
+
+      {/* Panel 5: Prioritized Verification Checklist (Spans full width) */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-lg relative overflow-hidden">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex items-center space-x-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-950 text-indigo-400 ring-1 ring-indigo-800">
+              <ListChecks className="h-4 w-4" />
+            </span>
+            <div>
+              <h3 className="text-sm font-bold text-white">Panel 5: Prioritized Next-Step Verification Checklist</h3>
+              <span className="text-[10px] text-indigo-400 font-medium">Actionable Resolution Path</span>
+            </div>
+          </div>
+          <span className="rounded bg-indigo-950/80 px-2 py-0.5 text-[10px] font-mono text-indigo-300 border border-indigo-800/60">
+            Action Items
+          </span>
+        </div>
+
+        <div className="mt-4">
+          {showSimulatedData ? (
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 text-xs">
+              <div className="rounded-xl border border-slate-800 bg-slate-950 p-3.5">
+                <div className="flex items-center space-x-2 text-rose-400 font-semibold mb-1">
+                  <span className="rounded bg-rose-950 px-1.5 py-0.5 text-[10px] border border-rose-800">Priority 1</span>
+                  <span>Confirm Income Limit</span>
+                </div>
+                <p className="text-[11px] text-slate-300">
+                  Verify with college nodal desk whether Rs. 2.5L is for general quota or if Rs. 8L applies to specific category exemptions.
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-950 p-3.5">
+                <div className="flex items-center space-x-2 text-amber-400 font-semibold mb-1">
+                  <span className="rounded bg-amber-950 px-1.5 py-0.5 text-[10px] border border-amber-800">Priority 2</span>
+                  <span>Official Tehsildar Certificate</span>
+                </div>
+                <p className="text-[11px] text-slate-300">
+                  Do not rely on the stamp paper affidavit mentioned in third-party guides; secure the digital Tehsildar certificate.
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-950 p-3.5">
+                <div className="flex items-center space-x-2 text-indigo-400 font-semibold mb-1">
+                  <span className="rounded bg-indigo-950 px-1.5 py-0.5 text-[10px] border border-indigo-800">Priority 3</span>
+                  <span>Ignore Offline 2023 Submission</span>
+                </div>
+                <p className="text-[11px] text-slate-300">
+                  Submit exclusively via the 2026-27 state portal; physical nodal officer submission is deprecated.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-800 bg-slate-950/40 p-6 text-center">
+              <ListChecks className="h-8 w-8 text-slate-600 mb-2" />
+              <div className="text-xs font-semibold text-slate-300">Actionable Resolution Checklist</div>
+              <p className="mt-1 text-[11px] text-slate-500 max-w-md">
+                Translates detected information gaps and cross-source conflicts into an ordered checklist for the user to resolve before submitting applications or signing contracts.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
+
+
+================================================
+FILE: frontend/src/components/Navbar.jsx
+================================================
+import React from 'react';
+import {
+  Radar,
+  KeyRound,
+  RotateCcw,
+  Database,
+  Cpu,
+  Sparkles,
+  ExternalLink,
+  ShieldCheck,
+  AlertCircle
+} from 'lucide-react';
+
+export default function Navbar({
+  backendHealth,
+  hasOpenRouterKey,
+  activeModel,
+  onOpenKeyModal,
+  onResetWorkspace,
+  forceOfflineDemo
+}) {
+  const isBackendOnline = backendHealth?.online;
+  const isDbConnected = backendHealth?.data?.dbConnected;
+  const storageMode = backendHealth?.data?.storageMode || (isBackendOnline ? 'In-Memory Fallback' : 'Browser Mode');
+
+  return (
+    <header className="sticky top-0 z-40 w-full border-b border-slate-800 bg-slate-950/90 backdrop-blur-md">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+        
+        {/* Left: Branding & Hackathon Tag */}
+        <div className="flex items-center space-x-3">
+          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-600 shadow-lg shadow-indigo-500/20 ring-1 ring-indigo-400/30">
+            <Radar className="h-5 w-5 text-white animate-pulse" />
+            <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-slate-950"></div>
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5">
+                Gap<span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-400">Lens</span>
+              </h1>
+              <span className="inline-flex items-center rounded-md bg-indigo-950/80 px-2 py-0.5 text-[11px] font-semibold text-indigo-300 ring-1 ring-inset ring-indigo-700/50">
+                Phase 0 & 1
+              </span>
+            </div>
+            <p className="hidden text-xs text-slate-400 sm:block">
+              AI-Assisted Information Gap Detection Platform &bull; <span className="text-indigo-400 font-medium">Digital Dark Spot</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Right: Status Pills & Action Buttons */}
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          
+          {/* Backend & DB Status Pill */}
+          <div className="hidden md:flex items-center space-x-2 rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs text-slate-300 ring-1 ring-slate-800">
+            <span className="relative flex h-2 w-2">
+              <span
+                className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                  isBackendOnline ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'
+                }`}
+              />
+              <span
+                className={`relative inline-flex h-2 w-2 rounded-full ${
+                  isBackendOnline ? 'bg-emerald-500' : 'bg-amber-500'
+                }`}
+              />
+            </span>
+            <span className="font-mono text-[11px]">
+              {isBackendOnline ? 'API :5000' : 'API Fallback'}
+            </span>
+            <span className="text-slate-600">|</span>
+            <Database className="h-3.5 w-3.5 text-slate-400" />
+            <span className={`text-[11px] font-medium ${isDbConnected ? 'text-emerald-400' : 'text-amber-400'}`}>
+              {isDbConnected ? 'Mongo DB' : 'In-Memory'}
+            </span>
+          </div>
+
+          {/* OpenRouter Mode Pill */}
+          <button
+            onClick={onOpenKeyModal}
+            className={`group inline-flex items-center space-x-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
+              forceOfflineDemo
+                ? 'bg-amber-950/60 text-amber-300 ring-1 ring-amber-700/50 hover:bg-amber-900/60'
+                : hasOpenRouterKey
+                ? 'bg-emerald-950/60 text-emerald-300 ring-1 ring-emerald-700/50 hover:bg-emerald-900/60'
+                : 'bg-indigo-950/60 text-indigo-300 ring-1 ring-indigo-700/50 hover:bg-indigo-900/60'
+            }`}
+            title="Configure OpenRouter API Key or switch AI models"
+          >
+            <Cpu className="h-3.5 w-3.5" />
+            <span className="truncate max-w-[110px] sm:max-w-[150px]">
+              {forceOfflineDemo
+                ? 'Offline Demo Mode'
+                : hasOpenRouterKey
+                ? 'OpenRouter Active'
+                : 'Demo / Setup Key'}
+            </span>
+            <span className="rounded bg-black/40 px-1 py-0.2 text-[10px] text-slate-300 font-mono">
+              {activeModel ? activeModel.split('/')[1] || activeModel : 'gemini-2.5-flash'}
+            </span>
+          </button>
+
+          {/* Settings / API Key Button */}
+          <button
+            onClick={onOpenKeyModal}
+            className="inline-flex items-center space-x-1 rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-slate-300 ring-1 ring-slate-800 hover:bg-slate-850 hover:text-white transition-colors"
+            title="OpenRouter Settings"
+          >
+            <KeyRound className="h-3.5 w-3.5 text-indigo-400" />
+            <span className="hidden sm:inline">Settings</span>
+          </button>
+
+          {/* Reset Workspace Button */}
+          <button
+            onClick={onResetWorkspace}
+            className="inline-flex items-center space-x-1 rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-slate-300 ring-1 ring-slate-800 hover:bg-rose-950/50 hover:text-rose-300 hover:ring-rose-800/60 transition-colors"
+            title="Clear current inputs and start fresh"
+          >
+            <RotateCcw className="h-3.5 w-3.5 text-slate-400 group-hover:text-rose-300" />
+            <span className="hidden sm:inline">Reset</span>
+          </button>
+
+        </div>
+      </div>
+    </header>
+  );
+}
+
+
+
+
+================================================
+FILE: frontend/src/components/SampleLoader.jsx
+================================================
+import React, { useState } from 'react';
+import {
+  Sparkles,
+  GraduationCap,
+  Store,
+  Check,
+  AlertTriangle,
+  Clock,
+  Layers,
+  ArrowRight
+} from 'lucide-react';
+
+export default function SampleLoader({ scenarios, onSelectScenario, activeScenarioId }) {
+  const [copiedNotification, setCopiedNotification] = useState(null);
+
+  const handleSelect = (scenario) => {
+    onSelectScenario(scenario);
+    setCopiedNotification(scenario.id);
+    setTimeout(() => {
+      setCopiedNotification(null);
+    }, 2000);
+  };
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-indigo-900/40 bg-gradient-to-r from-slate-900 via-indigo-950/30 to-slate-900 p-4 shadow-xl shadow-indigo-950/10 sm:p-5">
+      {/* Background glow decoration */}
+      <div className="pointer-events-none absolute -top-12 -right-12 h-40 w-40 rounded-full bg-indigo-500/10 blur-3xl" />
+
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        
+        {/* Left explanation */}
+        <div className="space-y-1">
+          <div className="flex items-center space-x-2">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600/30 text-indigo-400 ring-1 ring-indigo-500/50">
+              <Sparkles className="h-3 w-3" />
+            </span>
+            <span className="text-xs font-bold uppercase tracking-wider text-indigo-300">
+              Quick-Load Demo Scenarios (Judge Testing)
+            </span>
+            <span className="rounded-full bg-indigo-900/60 px-2 py-0.5 text-[10px] font-medium text-indigo-300 ring-1 ring-indigo-700/60">
+              1-Click Realistic Datasets
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 max-w-2xl">
+            Pre-configured test sets with intentional real-world flaws: contradictory thresholds, hidden prerequisites, and outdated cycles.
+          </p>
+        </div>
+
+        {/* Right buttons */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {scenarios && scenarios.map((scenario) => {
+            const isActive = activeScenarioId === scenario.id;
+            const isScholarship = scenario.id.includes('scholarship');
+            const Icon = isScholarship ? GraduationCap : Store;
+
+            return (
+              <button
+                key={scenario.id}
+                onClick={() => handleSelect(scenario)}
+                className={`group relative flex items-center space-x-2.5 rounded-xl border px-3.5 py-2.5 text-left transition-all ${
+                  isActive
+                    ? 'border-indigo-500 bg-indigo-950/80 text-white shadow-md shadow-indigo-500/20 ring-1 ring-indigo-400'
+                    : 'border-slate-800 bg-slate-950/80 text-slate-300 hover:border-slate-700 hover:bg-slate-900 hover:text-white'
+                }`}
+              >
+                <div
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                    isScholarship
+                      ? 'bg-blue-950 text-blue-400 ring-1 ring-blue-800/60'
+                      : 'bg-emerald-950 text-emerald-400 ring-1 ring-emerald-800/60'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                </div>
+
+                <div className="text-left">
+                  <div className="flex items-center space-x-1.5">
+                    <span className="text-xs font-bold leading-none">{scenario.name}</span>
+                    {isActive && (
+                      <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-500 text-slate-950">
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1 flex items-center space-x-1 text-[10px] text-slate-400">
+                    <span className="text-indigo-400 font-medium">{scenario.category}</span>
+                    <span>&bull;</span>
+                    <span>{scenario.sources?.length || 3} Sources</span>
+                  </div>
+                </div>
+
+                {copiedNotification === scenario.id && (
+                  <span className="absolute -top-2 right-2 rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-bold text-white shadow-lg animate-bounce">
+                    Loaded!
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+
+
+
+================================================
+FILE: frontend/src/components/SourceCard.jsx
+================================================
+import React, { useState } from 'react';
+import {
+  FileText,
+  Globe,
+  Calendar,
+  Sparkles,
+  Trash2,
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
+  ExternalLink,
+  RotateCcw,
+  Clock,
+  Layers
+} from 'lucide-react';
+import { extractUrlContent } from '../services/api';
+
+const SOURCE_TYPES = [
+  'Official Notice',
+  'Third-Party Guide',
+  'Archived Circular',
+  'News Article',
+  'Forum/Other',
+];
+
+const SOURCE_TYPE_COLORS = {
+  'Official Notice': 'bg-emerald-950/60 text-emerald-300 border-emerald-800/60',
+  'Third-Party Guide': 'bg-blue-950/60 text-blue-300 border-blue-800/60',
+  'Archived Circular': 'bg-purple-950/60 text-purple-300 border-purple-800/60',
+  'News Article': 'bg-amber-950/60 text-amber-300 border-amber-800/60',
+  'Forum/Other': 'bg-slate-800 text-slate-300 border-slate-700',
+};
+
+export default function SourceCard({
+  source,
+  index,
+  totalSources,
+  onUpdateSource,
+  onDeleteSource,
+}) {
+  const [extracting, setExtracting] = useState(false);
+  const [extractMessage, setExtractMessage] = useState(null);
+
+  const isUndated = !source.publishedDate || source.publishedDate.trim() === '';
+  const hasContent = Boolean(source.content && source.content.trim().length >= 10);
+  const wordCount = source.content ? source.content.trim().split(/\s+/).filter(Boolean).length : 0;
+
+  const handleFieldChange = (field, val) => {
+    onUpdateSource(source.id, { [field]: val });
+  };
+
+  const handleExtractUrl = async () => {
+    if (!source.url || !source.url.trim()) {
+      setExtractMessage({
+        type: 'error',
+        text: 'Please enter a valid URL first (e.g. https://...).',
+      });
+      return;
+    }
+
+    setExtracting(true);
+    setExtractMessage(null);
+
+    const result = await extractUrlContent(source.url.trim());
+    setExtracting(false);
+
+    if (result.success && result.content) {
+      onUpdateSource(source.id, {
+        content: result.content,
+        title: source.title || result.title || 'Extracted Web Article',
+      });
+      setExtractMessage({
+        type: 'success',
+        text: `Successfully scraped ${result.content.length} characters via ${result.extractedVia || 'Extraction Engine'}!`,
+      });
+    } else {
+      setExtractMessage({
+        type: 'warning',
+        text: result.message || 'Auto-extraction failed. Please copy & paste text directly.',
+      });
+    }
+
+    setTimeout(() => {
+      setExtractMessage(null);
+    }, 6000);
+  };
+
+  return (
+    <div className="relative rounded-2xl border border-slate-800 bg-slate-900/95 p-5 shadow-lg transition-all hover:border-slate-700">
+      
+      {/* Top Bar: Source Index Badge, Type Selector & Delete */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+        
+        {/* Source Badge */}
+        <div className="flex items-center space-x-2">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-950 font-mono text-xs font-bold text-indigo-300 ring-1 ring-indigo-800">
+            S{index + 1}
+          </span>
+          <span className="text-sm font-bold text-white tracking-tight">
+            Source {index + 1}
+          </span>
+          <span
+            className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold ${
+              SOURCE_TYPE_COLORS[source.sourceType] || 'bg-slate-800 text-slate-300'
+            }`}
+          >
+            {source.sourceType}
+          </span>
+        </div>
+
+        {/* Action icons & Type dropdown */}
+        <div className="flex items-center space-x-2">
+          <select
+            value={source.sourceType}
+            onChange={(e) => handleFieldChange('sourceType', e.target.value)}
+            className="rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1 text-xs font-medium text-slate-300 focus:border-indigo-500 focus:outline-none"
+          >
+            {SOURCE_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+
+          {/* Delete Source button (disabled if <= 2 sources) */}
+          <button
+            type="button"
+            disabled={totalSources <= 2}
+            onClick={() => onDeleteSource(source.id)}
+            title={
+              totalSources <= 2
+                ? 'Minimum 2 sources required for cross-verification'
+                : 'Remove this source'
+            }
+            className={`rounded-lg p-1.5 transition-colors ${
+              totalSources <= 2
+                ? 'cursor-not-allowed text-slate-600'
+                : 'text-slate-400 hover:bg-rose-950/50 hover:text-rose-400'
+            }`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+
+      </div>
+
+      {/* Grid Inputs: Title, Date, and URL */}
+      <div className="mt-4 grid grid-cols-1 gap-3.5 sm:grid-cols-12">
+        
+        {/* Title Input */}
+        <div className="sm:col-span-5">
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+            Source Title / Publisher
+          </label>
+          <div className="relative">
+            <input
+              type="text"
+              value={source.title}
+              onChange={(e) => handleFieldChange('title', e.target.value)}
+              placeholder="e.g. Official State Portal Notice"
+              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 placeholder-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium"
+            />
+          </div>
+        </div>
+
+        {/* Date / Cycle Input */}
+        <div className="sm:col-span-3">
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              Publication Date / Cycle
+            </label>
+          </div>
+          <div className="relative">
+            <input
+              type="text"
+              value={source.publishedDate}
+              onChange={(e) => handleFieldChange('publishedDate', e.target.value)}
+              placeholder="e.g. Sept 2026, or empty"
+              className={`w-full rounded-lg border px-3 py-2 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 ${
+                isUndated
+                  ? 'border-amber-700/60 bg-amber-950/20 focus:border-amber-500 focus:ring-amber-500'
+                  : 'border-slate-700 bg-slate-950 focus:border-indigo-500 focus:ring-indigo-500'
+              }`}
+            />
+          </div>
+        </div>
+
+        {/* URL Input + Scrape Button */}
+        <div className="sm:col-span-4">
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+            Source URL (Optional auto-fetch)
+          </label>
+          <div className="flex space-x-1.5">
+            <input
+              type="url"
+              value={source.url}
+              onChange={(e) => handleFieldChange('url', e.target.value)}
+              placeholder="https://..."
+              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-mono text-slate-100 placeholder-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+            <button
+              type="button"
+              disabled={extracting || !source.url}
+              onClick={handleExtractUrl}
+              title="Scrape and extract text automatically from this URL"
+              className="inline-flex shrink-0 items-center space-x-1 rounded-lg border border-indigo-700/60 bg-indigo-950 px-2.5 py-2 text-xs font-medium text-indigo-300 hover:bg-indigo-900 disabled:opacity-40 transition-colors"
+            >
+              {extracting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+              )}
+              <span className="hidden xl:inline">{extracting ? 'Scraping...' : 'Extract'}</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Undated notice or Scrape feedback banner */}
+      {extractMessage && (
+        <div
+          className={`mt-2 rounded-lg p-2 text-xs ring-1 ${
+            extractMessage.type === 'success'
+              ? 'bg-emerald-950/60 text-emerald-300 ring-emerald-800'
+              : extractMessage.type === 'error'
+              ? 'bg-rose-950/60 text-rose-300 ring-rose-800'
+              : 'bg-amber-950/60 text-amber-300 ring-amber-800'
+          }`}
+        >
+          {extractMessage.text}
+        </div>
+      )}
+
+      {isUndated && !extractMessage && (
+        <div className="mt-2 flex items-center space-x-1.5 rounded-lg bg-amber-950/30 px-2.5 py-1 text-[11px] text-amber-300/90 ring-1 ring-amber-800/40">
+          <Clock className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+          <span>
+            <strong className="font-semibold">Undated source notice:</strong> No published date or academic cycle specified. GapLens will flag this in the Outdated / Temporal Radar.
+          </span>
+        </div>
+      )}
+
+      {/* Content Textarea */}
+      <div className="mt-3">
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center space-x-1">
+            <FileText className="h-3.5 w-3.5 text-indigo-400" />
+            <span>Source Content / Excerpt</span>
+          </label>
+          <div className="flex items-center space-x-3 text-[10px] text-slate-500 font-mono">
+            <span>{wordCount} words</span>
+            <span>&bull;</span>
+            <span>{source.content?.length || 0} chars</span>
+            {source.content && (
+              <button
+                type="button"
+                onClick={() => handleFieldChange('content', '')}
+                className="text-slate-400 hover:text-rose-400 transition-colors"
+                title="Clear content"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        <textarea
+          rows={4}
+          value={source.content}
+          onChange={(e) => handleFieldChange('content', e.target.value)}
+          placeholder="Paste guidelines, eligibility criteria, circular excerpts, policy clauses, or blog text here..."
+          className="w-full resize-y rounded-xl border border-slate-700 bg-slate-950 p-3 text-xs text-slate-200 placeholder-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono leading-relaxed"
+        />
+      </div>
+
+    </div>
+  );
+}
+
+
+
+
+================================================
+FILE: frontend/src/components/SourceCollector.jsx
+================================================
+import React from 'react';
+import {
+  Layers,
+  Plus,
+  AlertCircle,
+  FileCheck,
+  CalendarClock,
+  Info
+} from 'lucide-react';
+import SourceCard from './SourceCard';
+
+export default function SourceCollector({
+  sources,
+  onAddSource,
+  onUpdateSource,
+  onDeleteSource,
+}) {
+  const maxSources = 6;
+  const minSources = 2;
+  const count = sources.length;
+  const canAdd = count < maxSources;
+
+  const validSourcesCount = sources.filter(
+    (s) => s.content && s.content.trim().length >= 10
+  ).length;
+
+  const undatedCount = sources.filter(
+    (s) => !s.publishedDate || !s.publishedDate.trim()
+  ).length;
+
+  return (
+    <div className="space-y-4">
+      
+      {/* Section Header */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/90 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        
+        <div>
+          <div className="flex items-center space-x-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-600/30 text-indigo-400 ring-1 ring-indigo-500/50">
+              <Layers className="h-3.5 w-3.5" />
+            </span>
+            <h2 className="text-base font-bold text-white tracking-tight">
+              2. Multi-Source Workspace
+            </h2>
+            <span className="rounded-md bg-slate-800 px-2 py-0.5 text-xs font-mono font-semibold text-slate-300">
+              {count} / {maxSources} Sources
+            </span>
+          </div>
+          <p className="mt-0.5 text-xs text-slate-400">
+            Feed multiple notices, handbooks, circulars, or web guides for cross-verification (Minimum 2 required).
+          </p>
+        </div>
+
+        {/* Source Status Pills */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Active sources with content */}
+          <div className="flex items-center space-x-1.5 rounded-lg bg-slate-950 px-2.5 py-1.5 text-xs ring-1 ring-slate-800">
+            <FileCheck
+              className={`h-3.5 w-3.5 ${
+                validSourcesCount >= 2 ? 'text-emerald-400' : 'text-amber-400'
+              }`}
+            />
+            <span className="text-slate-300">
+              <strong className={validSourcesCount >= 2 ? 'text-emerald-400' : 'text-amber-400'}>
+                {validSourcesCount}
+              </strong>
+              /{count} with text
+            </span>
+          </div>
+
+          {/* Undated warnings */}
+          {undatedCount > 0 && (
+            <div className="flex items-center space-x-1.5 rounded-lg bg-amber-950/40 px-2.5 py-1.5 text-xs text-amber-300 ring-1 ring-amber-800/50">
+              <CalendarClock className="h-3.5 w-3.5 text-amber-400" />
+              <span>{undatedCount} undated</span>
+            </div>
+          )}
+
+          {/* Add source button in header for convenience */}
+          {canAdd && (
+            <button
+              type="button"
+              onClick={onAddSource}
+              className="inline-flex items-center space-x-1.5 rounded-lg border border-indigo-600/60 bg-indigo-600/20 px-3 py-1.5 text-xs font-semibold text-indigo-300 hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Source</span>
+            </button>
+          )}
+        </div>
+
+      </div>
+
+      {/* Render Individual Source Cards */}
+      <div className="space-y-4">
+        {sources.map((source, index) => (
+          <SourceCard
+            key={source.id}
+            source={source}
+            index={index}
+            totalSources={sources.length}
+            onUpdateSource={onUpdateSource}
+            onDeleteSource={onDeleteSource}
+          />
+        ))}
+      </div>
+
+      {/* Bottom Add Source Button Bar */}
+      {canAdd ? (
+        <button
+          type="button"
+          onClick={onAddSource}
+          className="group flex w-full items-center justify-center space-x-2 rounded-2xl border-2 border-dashed border-slate-800 bg-slate-950/40 p-4 text-xs font-semibold text-slate-400 hover:border-indigo-600/60 hover:bg-indigo-950/20 hover:text-indigo-300 transition-all"
+        >
+          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-800 text-slate-300 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+            <Plus className="h-4 w-4" />
+          </div>
+          <span>Add Another Source ({count} of {maxSources} loaded)</span>
+        </button>
+      ) : (
+        <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3 text-center text-xs text-slate-500">
+          Maximum of {maxSources} sources reached for this session.
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+
+
+================================================
+FILE: frontend/src/components/TopicInput.jsx
+================================================
+import React from 'react';
+import {
+  HelpCircle,
+  Tag,
+  Search,
+  AlertTriangle,
+  GitCompare,
+  CalendarClock,
+  ListChecks,
+  CheckCircle2,
+  X
+} from 'lucide-react';
+
+const CATEGORIES = [
+  'Education',
+  'Careers',
+  'Public Services',
+  'Research',
+  'Business',
+];
+
+const INSPECTION_PILLARS = [
+  {
+    label: 'Missing Renewal/Hidden Rules',
+    icon: AlertTriangle,
+    color: 'text-amber-400 bg-amber-950/40 border-amber-800/50',
+    desc: 'Uncovers omitted eligibility clauses & prerequisites',
+  },
+  {
+    label: 'Cross-Source Contradictions',
+    icon: GitCompare,
+    color: 'text-rose-400 bg-rose-950/40 border-rose-800/50',
+    desc: 'Highlights conflicting income limits, fees, or documents',
+  },
+  {
+    label: 'Outdated Cycles/Dates',
+    icon: CalendarClock,
+    color: 'text-purple-400 bg-purple-950/40 border-purple-800/50',
+    desc: 'Detects superseded circulars & stale submission methods',
+  },
+  {
+    label: 'Prioritized Verification Checklist',
+    icon: ListChecks,
+    color: 'text-emerald-400 bg-emerald-950/40 border-emerald-800/50',
+    desc: 'Actionable steps to resolve blind spots before committing',
+  },
+];
+
+export default function TopicInput({
+  topic,
+  onTopicChange,
+  category,
+  onCategoryChange,
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-xl sm:p-6">
+      
+      {/* Header section with category dropdown */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 pb-4">
+        <div className="space-y-0.5">
+          <div className="flex items-center space-x-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-600/30 text-indigo-400 ring-1 ring-indigo-500/50">
+              <Search className="h-3.5 w-3.5" />
+            </span>
+            <h2 className="text-base font-bold text-white tracking-tight">
+              1. Research Question / Decision Goal
+            </h2>
+          </div>
+          <p className="text-xs text-slate-400">
+            Define what high-stakes decision, application, or policy you are investigating.
+          </p>
+        </div>
+
+        {/* Category Picker */}
+        <div className="flex items-center space-x-2 self-start sm:self-auto">
+          <Tag className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+          <span className="text-xs font-medium text-slate-300">Category:</span>
+          <select
+            value={category}
+            onChange={(e) => onCategoryChange(e.target.value)}
+            className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-indigo-300 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          >
+            {CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Main Topic Input Field */}
+      <div className="mt-4">
+        <div className="relative">
+          <textarea
+            rows={2}
+            value={topic}
+            onChange={(e) => onTopicChange(e.target.value)}
+            placeholder="e.g. What should I verify before applying for the State Post-Matric Scholarship? (Or describe your licensing/academic query...)"
+            className="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all font-medium leading-relaxed"
+          />
+          {topic && (
+            <button
+              onClick={() => onTopicChange('')}
+              className="absolute top-3 right-3 rounded-md p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+              title="Clear topic"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Character count & validation indicator */}
+        <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-500">
+          <div className="flex items-center space-x-1.5">
+            {topic.trim().length >= 10 ? (
+              <span className="flex items-center space-x-1 text-emerald-400">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                <span>Goal defined</span>
+              </span>
+            ) : (
+              <span className="text-amber-400/80">
+                Enter a concise question or decision objective (at least 10 characters)
+              </span>
+            )}
+          </div>
+          <span>{topic.length} characters</span>
+        </div>
+      </div>
+
+      {/* Helper chips: What GapLens cross-examines */}
+      <div className="mt-4 pt-3 border-t border-slate-800/80">
+        <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
+          GapLens Automated Cross-Examination Pillars:
+        </div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {INSPECTION_PILLARS.map((pillar, idx) => {
+            const Icon = pillar.icon;
+            return (
+              <div
+                key={idx}
+                className={`flex items-start space-x-2 rounded-xl border p-2.5 transition-colors ${pillar.color}`}
+              >
+                <Icon className="h-4 w-4 mt-0.5 shrink-0" />
+                <div>
+                  <div className="text-xs font-semibold leading-tight">{pillar.label}</div>
+                  <div className="mt-0.5 text-[10px] opacity-80 leading-snug">{pillar.desc}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
+
+
+
+================================================
+FILE: frontend/src/data/fallbackScenarios.js
+================================================
+/**
+ * Client-Side Fallback Scenarios for GapLens
+ * Ensures zero-latency demonstration even if backend or database is offline.
+ * Shinchan Online Hackathon 2026: Digital Dark Spot
+ */
+
+export const FALLBACK_SCENARIOS = [
+  {
+    id: 'scholarship-2026',
+    name: 'Post-Matric Scholarship Verification',
+    badge: 'Official Hackathon Case',
+    category: 'Education',
+    topic: 'What should I verify before applying for the State Post-Matric Scholarship?',
+    flawsSummary: 'Conflicting income limits (2.5L vs 8L), missing renewal criteria, and stale 2023 offline deadline',
+    sources: [
+      {
+        id: 'src-1',
+        title: 'Official State Scholarship Portal Guidelines',
+        sourceType: 'Official Notice',
+        url: 'https://scholarships.gov.example/post-matric-2026',
+        publishedDate: 'September 2026 (2026-27 Cycle)',
+        content:
+          'Eligibility: Applicants must be domiciled in the state and have secured at least 75% marks in the previous qualifying examination. Annual family income from all sources must not exceed Rs. 2,50,000. Required Documents: Aadhaar Card, Previous Year Marksheet, Bank Passbook copy, and Income Certificate issued by Tehsildar. Note: Applications must be submitted online via the official portal.',
+      },
+      {
+        id: 'src-2',
+        title: 'EduCareer Student Guidance Blog',
+        sourceType: 'Third-Party Guide',
+        url: 'https://educareer-guide.example/state-scholarship-details',
+        publishedDate: 'August 2026',
+        content:
+          'The State Post-Matric Scholarship supports undergraduate engineering and degree students. Students with a family income up to Rs. 8,00,000 per annum are eligible to apply. Documents required include a self-attested income declaration on a Rs. 100 stamp paper, Ration Card, Bonafide Certificate from the college principal, and Caste Validity Certificate.',
+      },
+      {
+        id: 'src-3',
+        title: 'Regional Directorate Circular Archive',
+        sourceType: 'Archived Circular',
+        url: 'https://dte-archive.example/circular-2023-24.pdf',
+        publishedDate: 'October 2023 (2023-24 Cycle)',
+        content:
+          'All eligible scholarship candidates for the 2023-24 academic cycle must submit hard copies of their application form along with original verification slips to the District Nodal Officer on or before 15th November 2023.',
+      },
+    ],
+  },
+  {
+    id: 'fssai-cloud-kitchen',
+    name: 'Cloud Kitchen Licensing & Compliance',
+    badge: 'Business & Regulatory',
+    category: 'Business',
+    topic: 'What licenses, fire safety rules, and renewal steps are required to start a home-based cloud kitchen?',
+    flawsSummary: 'Conflicting turnover thresholds (10L vs 12L) + Undated blog missing Fire & Pollution NOCs',
+    sources: [
+      {
+        id: 'src-1',
+        title: 'Food Safety Authority Portal (FSSAI Basic Guidelines)',
+        sourceType: 'Official Notice',
+        url: 'https://fssai.gov.example/cloud-kitchen-standards',
+        publishedDate: 'January 2026',
+        content:
+          'Home-based food operators and cloud kitchens having an annual turnover of up to Rs. 12 Lakhs are required to obtain only a Basic FSSAI Registration Certificate (Form A). Key requirements include identity proof, kitchen layout sketch, potable water test report, and food handler medical fitness certificate. Annual renewal must be applied 30 days prior to expiry.',
+      },
+      {
+        id: 'src-2',
+        title: 'Municipal Corporation Trade Licensing Advisory',
+        sourceType: 'Third-Party Guide',
+        url: 'https://smb-advisory.example/delhi-mumbai-cloud-kitchen-rules',
+        publishedDate: 'March 2026',
+        content:
+          'All commercial food delivery establishments regardless of turnover require a Municipal Health Trade License and Shop & Establishment registration. Commercial electricity connection is mandatory. Any kitchen with power load exceeding 5KW or turnover exceeding Rs. 10 Lakhs must obtain a State FSSAI License rather than Basic Registration.',
+      },
+      {
+        id: 'src-3',
+        title: 'Cloud Kitchen Startup Digest Blog',
+        sourceType: 'Forum/Other',
+        url: 'https://cloudkitchenhustle.example/starting-from-home',
+        publishedDate: '', // Undated to trigger temporal warning
+        content:
+          'You can launch a delivery-only kitchen from your apartment instantly using aggregator platforms. No fire department NOC or pollution clearance is needed for residential kitchens with domestic LPG cylinders. Simply upload your PAN card and personal bank statement to start accepting online orders.',
+      },
+    ],
+  },
+];
+
+
+
+
+================================================
+FILE: frontend/src/services/api.js
+================================================
+import axios from 'axios';
+import { FALLBACK_SCENARIOS } from '../data/fallbackScenarios';
+
+// Determine backend base URL: uses current host proxy or direct localhost:5000
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 12000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Interceptor to inject client-side OpenRouter credentials if stored in localStorage
+apiClient.interceptors.request.use((config) => {
+  const clientKey = localStorage.getItem('gaplens_openrouter_key');
+  const clientModel = localStorage.getItem('gaplens_openrouter_model') || 'google/gemini-2.5-flash';
+
+  if (clientKey && clientKey.trim()) {
+    config.headers['x-openrouter-key'] = clientKey.trim();
+  }
+  config.headers['x-openrouter-model'] = clientModel;
+
+  return config;
+});
+
+/**
+ * Fetch backend system health and configuration status
+ */
+export const checkHealth = async () => {
+  try {
+    const res = await apiClient.get('/health');
+    return {
+      online: true,
+      data: res.data,
+    };
+  } catch (err) {
+    return {
+      online: false,
+      error: err.message,
+      data: {
+        status: 'offline-demo',
+        dbConnected: false,
+        storageMode: 'Browser In-Memory Fallback',
+        hasServerOpenRouterKey: false,
+        defaultModel: 'google/gemini-2.5-flash',
+      },
+    };
+  }
+};
+
+/**
+ * Fetch hackathon pre-seeded sample scenarios
+ */
+export const fetchScenarios = async () => {
+  try {
+    const res = await apiClient.get('/scenarios');
+    if (res.data && res.data.scenarios && res.data.scenarios.length > 0) {
+      return res.data.scenarios;
+    }
+    return FALLBACK_SCENARIOS;
+  } catch (err) {
+    console.warn('[GapLens API] Backend scenarios offline, using local fallback scenarios.');
+    return FALLBACK_SCENARIOS;
+  }
+};
+
+/**
+ * Extract clean readable content from a given URL via backend Jina AI / Cheerio scraper
+ */
+export const extractUrlContent = async (url) => {
+  try {
+    const res = await apiClient.post('/extract-url', { url });
+    return res.data;
+  } catch (err) {
+    return {
+      success: false,
+      message:
+        err.response?.data?.message ||
+        'Unable to reach backend URL extraction service. Please paste text directly into the Source Content box.',
+    };
+  }
+};
+
+/**
+ * Save current research session (persisted to MongoDB or In-Memory backend store)
+ */
+export const saveResearchSession = async (sessionData) => {
+  try {
+    const res = await apiClient.post('/sessions', sessionData);
+    return res.data;
+  } catch (err) {
+    console.warn('[GapLens API] Session save error, caching locally in localStorage');
+    const localId = `local-${Date.now()}`;
+    const localRecord = { ...sessionData, _id: localId, savedLocally: true };
+    const history = JSON.parse(localStorage.getItem('gaplens_local_sessions') || '[]');
+    history.unshift(localRecord);
+    localStorage.setItem('gaplens_local_sessions', JSON.stringify(history.slice(0, 20)));
+    return {
+      success: true,
+      storage: 'localStorage',
+      session: localRecord,
+    };
+  }
+};
+
+/**
+ * Trigger Phase 1 analysis preparation & validation
+ */
+export const triggerAnalysisPrep = async (payload) => {
+  const clientKey = localStorage.getItem('gaplens_openrouter_key');
+  const clientModel = localStorage.getItem('gaplens_openrouter_model') || 'google/gemini-2.5-flash';
+
+  const enrichedPayload = {
+    ...payload,
+    openRouterKey: clientKey || payload.openRouterKey,
+    model: clientModel || payload.model,
+  };
+
+  try {
+    const res = await apiClient.post('/analyze', enrichedPayload);
+    return res.data;
+  } catch (err) {
+    if (err.response?.data) {
+      return err.response.data;
+    }
+    // Fallback validation stub on frontend
+    const validSources = (payload.sources || []).filter(
+      (s) => s.content && s.content.trim().length > 10
+    );
+    const undated = validSources.filter((s) => !s.publishedDate || !s.publishedDate.trim());
+
+    if (!payload.topic || !payload.topic.trim()) {
+      return { success: false, message: 'Please enter a research topic or decision goal.' };
+    }
+    if (validSources.length < 2) {
+      return { success: false, message: 'At least 2 sources with text are required.' };
+    }
+
+    return {
+      success: true,
+      readyForPhase3: true,
+      message: 'Workspace validated via Client Fallback Engine.',
+      validation: {
+        topic: payload.topic,
+        category: payload.category || 'Education',
+        totalSources: validSources.length,
+        undatedCount: undated.length,
+        hasUndatedWarning: undated.length > 0,
+        totalCharacters: validSources.reduce((acc, s) => acc + s.content.length, 0),
+      },
+      aiConfig: {
+        hasKey: Boolean(clientKey),
+        keySource: clientKey ? 'client' : 'none',
+        activeModel: clientModel,
+        mode: clientKey ? 'Live OpenRouter AI' : 'Offline Seeded Demo Mode',
+      },
+    };
+  }
+};
+
+/**
+ * Direct OpenRouter probe (for checking key validity in modal)
+ */
+export const probeOpenRouter = async (key, model = 'google/gemini-2.5-flash') => {
+  if (!key || !key.trim()) {
+    return { success: false, message: 'API key is empty.' };
+  }
+
+  try {
+    const res = await axios.post(
+      'https://openrouter.ai/api/v1/chat/completions',
+      {
+        model,
+        messages: [{ role: 'user', content: 'Say "GapLens OpenRouter Ready" in 4 words.' }],
+        max_tokens: 15,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${key.trim()}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://gaplens.local',
+          'X-Title': 'GapLens Hackathon Platform',
+        },
+        timeout: 10000,
+      }
+    );
+
+    const reply = res.data?.choices?.[0]?.message?.content || 'Verified successfully';
+    return {
+      success: true,
+      reply,
+      modelUsed: res.data?.model || model,
+    };
+  } catch (err) {
+    const msg =
+      err.response?.data?.error?.message ||
+      err.response?.data?.message ||
+      err.message ||
+      'Failed to reach OpenRouter API';
+    return { success: false, message: msg };
+  }
+};
+
+
+
