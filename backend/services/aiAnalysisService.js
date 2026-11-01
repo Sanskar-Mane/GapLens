@@ -11,6 +11,7 @@
  */
 
 const https = require('https');
+const crypto = require('crypto');
 const axios = require('axios');
 const {
   PRECOMPUTED_ANALYSES,
@@ -29,6 +30,73 @@ const ipv4HttpsAgent = new https.Agent({
   keepAlive: true,
   timeout: 15000,
 });
+
+// In-Memory Request Cache for Zero-Token Repeat Audits (max 50 entries)
+const analysisCache = new Map();
+const MAX_CACHE_ENTRIES = 50;
+
+/**
+ * High-Signal Source Text Compressor
+ * Strips URLs, normalizes whitespace, and prioritizes regulatory/factual sentences up to maxChars (default 1200).
+ */
+function compressSourceForLLM(rawContent, maxChars = 1200) {
+  if (!rawContent || typeof rawContent !== 'string') return '';
+
+  // 1. Strip Markdown link URLs while keeping anchor text
+  let text = rawContent.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+
+  // 2. Strip raw inline http:// or https:// URLs inside body text
+  text = text.replace(/https?:\/\/[^\s)]+/gi, '');
+
+  // 3. Collapse multiple spaces, tabs, and newlines
+  text = text.replace(/\s+/g, ' ').trim();
+
+  if (text.length <= maxChars) {
+    return text;
+  }
+
+  // 4. Split text into sentences
+  const sentenceList = text.match(/[^.!?]+(?:[.!?]+|$)/g) || [text];
+  const trimmed = sentenceList.map((s) => s.trim()).filter((s) => s.length > 0);
+
+  if (trimmed.length <= 1) {
+    return text.slice(0, maxChars).trim();
+  }
+
+  // Prioritize sentences with regulatory signals: digits, currency, years, policy keywords
+  const signalRegex = /\b(\d+|rs\.?|inr|lakhs?|crores?|fees?|202\d|must|mandatory|requires?|required|eligible|eligibility|limit|limits|deadline|deadlines|renews?|renewal|certificate|certificates|noc|licen[sc]e|licen[sc]es|exempt|exemption|offline|online)\b/i;
+
+  const scored = trimmed.map((sentence, idx) => {
+    const matches = sentence.match(new RegExp(signalRegex.source, 'gi'));
+    return {
+      sentence,
+      score: matches ? matches.length : 0,
+      index: idx,
+      length: sentence.length,
+    };
+  });
+
+  // Sort descending by score; if tied, retain original chronological position
+  const sorted = [...scored].sort((a, b) => b.score - a.score || a.index - b.index);
+
+  const selected = [];
+  let currentLen = 0;
+
+  for (const item of sorted) {
+    if (currentLen + item.length + 1 <= maxChars) {
+      selected.push(item);
+      currentLen += item.length + 1;
+    }
+  }
+
+  if (selected.length === 0 && trimmed.length > 0) {
+    return trimmed[0].slice(0, maxChars).trim();
+  }
+
+  // Re-sort to preserve natural narrative order
+  selected.sort((a, b) => a.index - b.index);
+  return selected.map((s) => s.sentence).join(' ').trim();
+}
 
 /**
  * Match a topic string against the precomputed scenarios
@@ -388,6 +456,38 @@ async function analyzeSourcesWithAI({
     };
   }
 
+  // 1. In-Memory Request Cache Check (Zero-Token Repeat Audits)
+  const cacheKey = crypto
+    .createHash('sha256')
+    .update(
+      JSON.stringify({
+        topic: (topic || '').trim().toLowerCase(),
+        category,
+        sources: (sources || []).map((s) => ({
+          id: s.id,
+          title: s.title,
+          date: s.publishedDate,
+          content: (s.content || '').slice(0, 1200),
+        })),
+      })
+    )
+    .digest('hex');
+
+  if (analysisCache.has(cacheKey)) {
+    const cachedEntry = analysisCache.get(cacheKey);
+    console.log(`[GapLens AI Cache] Cache HIT for "${(topic || '').slice(0, 45)}" (0 upstream tokens used)`);
+    return {
+      success: true,
+      analysis: cachedEntry.analysis,
+      meta: {
+        ...cachedEntry.meta,
+        cached: true,
+        tokensSaved: true,
+        timestamp: new Date().toISOString(),
+      },
+    };
+  }
+
   // Baseline structure for normalization if the LLM output omits optional fields
   const baselineStructure = generateDynamicFallbackAnalysis(topic, category, sources);
 
@@ -410,171 +510,48 @@ async function analyzeSourcesWithAI({
     }
   }
 
-  // 2. CONSTRUCT SYSTEM & USER PROMPT WITH TRACEABILITY & RUBRIC INSTRUCTIONS
-  const systemPrompt = `You are GapLens, an elite objective Information Gap & Contradiction Auditor for the year 2026.
-Your mission is to solve the "Digital Dark Spot" problem: revealing what information is MISSING, CONTRADICTED, OUTDATED, or UNVERIFIED across multiple sources.
-
-RESPONSIBLE AI RULES, TRACEABILITY & GUARDRAILS:
-1. Anti-Hallucination & Traceable Quotes:
-   - For every item in "sourcedFacts", provide an exact "evidenceQuote" (a short, exact verbatim substring quote from the source's content text) so the frontend can highlight it.
-   - For every item in "contradictions", provide exact "evidenceQuote" substrings for both "sourceA" and "sourceB".
-   - Do NOT invent missing policies, deadlines, or conditions.
-2. Epistemic Labels:
-   - Label every gap with signalLabel: "Potential Gap — Not Found in Reviewed Sources" or "Potential Gap — AI Signal".
-   - Label every contradiction with signalLabel: "Possible Conflict Between Sources".
-3. Current Year Baseline:
-   - The current academic & regulatory year is 2026.
-   - Treat sources dated 2024 or earlier as potentially superseded or outdated. Flag sources missing a publication date as "Missing Publication Date".
-4. Expected Rubric & Rubric Status:
-   - Define "expectedRubric": array of 5 to 6 essential decision parameters required for this topic.
-   - Provide "rubricStatus": array of objects classifying each expected parameter as "verified", "conflict", or "missing", with "linkedIds".
-5. CRITICAL JSON FORMATTING & SYNTAX GUARDRAILS:
-   - Output 100% valid, strictly parseable JSON starting directly with '{' and ending with '}'.
-   - NO trailing commas anywhere in objects or arrays (NEVER place a comma right before '}' or ']').
-   - NO conversational preamble, explanations, notes, or postscripts (do NOT say "Here is your JSON", do NOT append commentary).
-   - NO markdown code block wrappers (do NOT wrap with \`\`\`json or \`\`\`).
-   - Properly escape all double quotes inside string values using '\\\"' (e.g. \\\"required document\\\").
-   - NEVER place unescaped raw literal newlines or control characters inside string literals; encode newlines as '\\n'.
-   - All object keys and string values must use standard double quotes (\").
-6. Hierarchy of Authority (LHoA) Conflict Arbiter:
-   - For every contradiction, evaluate the evidentiary authority weight:
-     Tier 1: Statutory Acts, Gazettes & Binding Circulars
-     Tier 2: Official Department Portals & Direct Administrative Guidelines
-     Tier 3: Secondary Advisory Guides & Reputable Educational Media
-     Tier 4: Unverified Community Posts, Blogs, Forums & Crowdsourced FAQs
-   - Inside each contradiction item, provide "precedenceVerdict" with "bindingSourceId", "confidence" (Definitive Precedence | Strong Suggestion | Unresolved Parity), and "legalWeightReasoning".
-7. Pre-Mortem Decision Risk Simulator:
-   - Perform a forward-looking consequence stress test.
-   - Include top-level "decisionPreMortem" with "overallRiskLevel" (Severe Risk | High Risk | Moderate Risk), "estimatedDelay", "consequenceSummary", and "criticalFailurePoints" detailing what specifically fails if unverified.
-
-REQUIRED JSON SCHEMA:
-{
-  "readinessScore": <integer 0-100 indicating decision readiness (lower = more risky gaps/conflicts)>,
-  "readinessLabel": "<e.g. Moderate Risk — Critical Renewal Gaps & Income Limit Conflict>",
-  "executiveSummary": "<2-3 sentence executive audit summarizing coverage, key contradictions, and critical missing parameters>",
-  "expectedRubric": ["<5 to 6 essential decision parameters for this topic/category>"],
-  "rubricStatus": [
-    {
-      "parameter": "<name of rubric parameter>",
-      "status": "<verified | conflict | missing>",
-      "linkedIds": ["<fact-id | conf-id | gap-id>"]
-    }
-  ],
-  "sourcedFacts": [
-    {
-      "id": "fact-1",
-      "category": "<category name>",
-      "statement": "<direct corroborated fact>",
-      "sourceIds": ["<src-id>"],
-      "sourceTitles": ["<source title>"],
-      "confidence": "<High (Official Source) | Medium | Low>",
-      "evidenceQuote": "<exact verbatim short quote from the source text>"
-    }
-  ],
-  "informationGaps": [
-    {
-      "id": "gap-1",
-      "title": "<title of missing requirement>",
-      "missingQuestion": "<precise question the applicant cannot answer from these sources>",
-      "impactLevel": "<Critical | High | Medium | Low>",
-      "signalLabel": "Potential Gap — Not Found in Reviewed Sources",
-      "explanation": "<why this absence is dangerous>"
-    }
-  ],
-  "contradictions": [
-    {
-      "id": "conf-1",
-      "parameter": "<disputed parameter name>",
-      "severity": "<Critical Conflict | High Conflict | Moderate Conflict>",
-      "signalLabel": "Possible Conflict Between Sources",
-      "sourceA": {
-        "sourceId": "src-1",
-        "title": "<title A>",
-        "claim": "<claim from A>",
-        "evidenceQuote": "<exact verbatim quote from source A>"
-      },
-      "sourceB": {
-        "sourceId": "src-2",
-        "title": "<title B>",
-        "claim": "<claim from B>",
-        "evidenceQuote": "<exact verbatim quote from source B>"
-      },
-      "resolutionAdvice": "<practical guidance on how user should verify which is legally binding>",
-      "precedenceVerdict": {
-        "bindingSourceId": "<src-id of the authoritative source>",
-        "confidence": "<Definitive Precedence | Strong Suggestion | Unresolved Parity>",
-        "legalWeightReasoning": "<Explain why source A overrides source B based on authority hierarchy: Official Notice/Gazette > Secondary Blog/Forum>"
-      }
-    }
-  ],
-  "outdatedWarnings": [
-    {
-      "id": "time-1",
-      "sourceId": "<sourceId>",
-      "sourceTitle": "<sourceTitle>",
-      "detectedDate": "<detected date or 'Undated'>",
-      "warningType": "<Outdated Cycle | Missing Publication Date | Expired Circular>",
-      "riskDescription": "<specific risk of relying on this source>",
-      "evidenceQuote": "<short quote from source illustrating date context>"
-    }
-  ],
-  "verificationChecklist": [
-    {
-      "id": "chk-1",
-      "priority": "<High | Medium | Low>",
-      "actionItem": "<concrete action item>",
-      "targetAuthority": "<exact agency or office to contact>",
-      "reason": "<why this step is necessary>"
-    }
-  ],
-  "decisionPreMortem": {
-    "overallRiskLevel": "<Severe Risk | High Risk | Moderate Risk>",
-    "estimatedDelay": "<e.g. 30 to 60 Days Lodgment Delay>",
-    "consequenceSummary": "<Direct 2-sentence explanation of what happens if user submits based on currently available info>",
-    "criticalFailurePoints": [
-      {
-        "darkSpotRef": "<gap-id or conf-id>",
-        "failureScenario": "<Specific reason application/compliance will fail>",
-        "penaltyOrLoss": "<Financial loss, statutory rejection, or forfeiture>"
-      }
-    ]
-  }
-}`;
-
-  // Format the user sources for the model (capped at 3,000 chars per source to avoid payload over-bloat)
+  // 2. High-Signal Compressed Sources (1200 chars max per source)
   const sourcesText = sources
     .map(
-      (s, idx) => `--- SOURCE ${idx + 1} ---
-ID: ${s.id || `src-${idx + 1}`}
-Title: ${s.title || `Source ${idx + 1}`}
-Type: ${s.sourceType || 'General'}
-URL: ${s.url || 'N/A'}
-Published Date: ${s.publishedDate || 'Undated / Missing Date'}
-Content:
-${(s.content || '').slice(0, 3000) || '(No content provided)'}
-`
+      (s, idx) => `[SOURCE ${s.id || `src-${idx + 1}`}: "${s.title || `Source ${idx + 1}`}" | Origin: ${s.isAutoDiscovered ? 'AUTO-DISCOVERED RELATIVE WEBSITE' : 'USER-PROVIDED SOURCE'} | URL: ${s.url || 'N/A'} | Type: ${s.sourceType || 'General'} | Date: ${s.publishedDate || 'Undated'}]
+${compressSourceForLLM(s.content, 1200) || '(No content provided)'}`
     )
     .join('\n\n');
 
-  const userPrompt = `AUDIT REQUEST:
-Research Topic: ${topic}
-Category: ${category}
-Current Year: 2026
+  // 3. Minified Token-Dense System & User Prompts
+  const systemPrompt = `You are GapLens, an objective Information Gap & Contradiction Auditor for 2026.
+Rules:
+1. Anti-hallucination: "evidenceQuote" MUST be an exact verbatim substring (8-18 words) from the cited source text.
+2. Hybrid Corpus Audit: Compare USER-PROVIDED SOURCE claims against AUTO-DISCOVERED RELATIVE WEBSITE claims to expose hidden omissions (Information Gaps) that were missing from the user's initial sources or remain unanswered across the entire web corpus.
+3. Conciseness: statement, explanation, resolutionAdvice, riskDescription, and failureScenario must each be under 22 words.
+4. Max items: Return top 3-4 items max for sourcedFacts, informationGaps, contradictions, verificationChecklist, criticalFailurePoints.
+5. Authority (LHoA): Tier 1 Statutory > Tier 2 Official > Tier 3 Media > Tier 4 Blogs/Forums. Assign bindingSourceId in precedenceVerdict.
+6. Epistemic Labels: signalLabel for gaps: "Potential Gap — Not Found in Reviewed Sources"; for contradictions: "Possible Conflict Between Sources".
+7. Return 100% valid JSON only, without markdown code fences or commentary, matching this exact schema:
+{
+  "readinessScore": <0-100 int>,
+  "readinessLabel": "<concise risk label>",
+  "executiveSummary": "<2 sentence summary of gaps and contradictions>",
+  "expectedRubric": ["<5 to 6 essential parameters>"],
+  "rubricStatus": [{"parameter": "<name>", "status": "<verified|conflict|missing>", "linkedIds": ["<id>"]}],
+  "sourcedFacts": [{"id": "fact-1", "category": "<type>", "statement": "<under 22 words>", "sourceIds": ["src-1"], "sourceTitles": ["<title>"], "confidence": "<High (Official Source)|Medium>", "evidenceQuote": "<verbatim 8-18 words>"}],
+  "informationGaps": [{"id": "gap-1", "title": "<title>", "missingQuestion": "<question>", "impactLevel": "<Critical|High|Medium>", "signalLabel": "Potential Gap — Not Found in Reviewed Sources", "explanation": "<under 22 words>"}],
+  "contradictions": [{"id": "conf-1", "parameter": "<param>", "severity": "<Critical Conflict|High Conflict|Moderate Conflict>", "signalLabel": "Possible Conflict Between Sources", "sourceA": {"sourceId": "src-1", "title": "<t1>", "claim": "<claim>", "evidenceQuote": "<verbatim 8-18 words>"}, "sourceB": {"sourceId": "src-2", "title": "<t2>", "claim": "<claim>", "evidenceQuote": "<verbatim 8-18 words>"}, "resolutionAdvice": "<under 22 words>", "precedenceVerdict": {"bindingSourceId": "src-1", "confidence": "Definitive Precedence", "legalWeightReasoning": "<under 22 words>"}}],
+  "outdatedWarnings": [{"id": "time-1", "sourceId": "src-1", "sourceTitle": "<title>", "detectedDate": "<date|Undated>", "warningType": "<Outdated Cycle|Missing Publication Date>", "riskDescription": "<under 22 words>", "evidenceQuote": "<verbatim 8-18 words>"}],
+  "verificationChecklist": [{"id": "chk-1", "priority": "<High|Medium|Low>", "actionItem": "<action>", "targetAuthority": "<agency>", "reason": "<under 22 words>"}],
+  "decisionPreMortem": {"overallRiskLevel": "<Severe Risk|High Risk|Moderate Risk>", "estimatedDelay": "<delay>", "consequenceSummary": "<under 22 words>", "criticalFailurePoints": [{"darkSpotRef": "<gap-1|conf-1>", "failureScenario": "<under 22 words>", "penaltyOrLoss": "<penalty>"}]}
+}`;
+
+  const userPrompt = `AUDIT GOAL: ${topic}
+CATEGORY: ${category}
+CURRENT YEAR: 2026
 
 SOURCES TO AUDIT:
 ${sourcesText}
 
-Perform an exhaustive, objective audit following Steps A through F:
-- Step A: Define the 5-6 expected rubric items for "${topic}" and classify each in "rubricStatus".
-- Step B: Extract corroborated sourcedFacts citing sourceIds, sourceTitles, and exact evidenceQuote substrings.
-- Step C: Identify all informationGaps (rubric items missing from the text).
-- Step D: Identify all contradictions where sources diverge on limits, deadlines, or paperwork, with exact evidenceQuote for both sourceA and sourceB.
-- Step E: Flag outdatedWarnings for undated sources or sources dated 2024 or earlier.
-- Step F: Generate a prioritized verificationChecklist.
+Audit for information gaps, cross-source contradictions, and temporal issues. Return strictly the JSON object.`;
 
-Return strictly the JSON object.`;
-
-  // 3. EXECUTE MULTI-MODEL FAILOVER QUEUE
+  // 4. EXECUTE MULTI-MODEL FAILOVER QUEUE
   let lastError = null;
   const attemptedModels = [];
 
@@ -587,30 +564,73 @@ Return strictly the JSON object.`;
         modelToTry
       )}:generateContent?key=${encodeURIComponent(activeKey.trim())}`;
 
-      const response = await axios.post(
-        geminiEndpoint,
-        {
-          systemInstruction: {
-            parts: [{ text: systemPrompt }],
-          },
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: userPrompt }],
+      const generationConfig = {
+        temperature: 0.1,
+        maxOutputTokens: 2200,
+        responseMimeType: 'application/json',
+      };
+
+      // Disable hidden thinking token overhead on Gemini 2.5 models for fast, low-token JSON output
+      if (modelToTry.includes('2.5')) {
+        generationConfig.thinkingConfig = { thinkingBudget: 0 };
+      }
+
+      let response;
+      try {
+        response = await axios.post(
+          geminiEndpoint,
+          {
+            systemInstruction: {
+              parts: [{ text: systemPrompt }],
             },
-          ],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 6500,
-            responseMimeType: 'application/json',
+            contents: [
+              {
+                role: 'user',
+                parts: [{ text: userPrompt }],
+              },
+            ],
+            generationConfig,
           },
-        },
-        {
-          headers: { 'Content-Type': 'application/json' },
-          httpsAgent: ipv4HttpsAgent,
-          timeout: 45000,
+          {
+            headers: { 'Content-Type': 'application/json' },
+            httpsAgent: ipv4HttpsAgent,
+            timeout: 45000,
+          }
+        );
+      } catch (postErr) {
+        // If HTTP 400 error rejects thinkingConfig, retry immediately without thinkingConfig
+        const errMsg = postErr.response?.data?.error?.message || JSON.stringify(postErr.response?.data || '');
+        if (
+          postErr.response?.status === 400 &&
+          generationConfig.thinkingConfig &&
+          errMsg.toLowerCase().includes('thinking')
+        ) {
+          console.warn(`[GapLens AI] Model "${modelToTry}" rejected thinkingConfig. Retrying without thinkingConfig...`);
+          delete generationConfig.thinkingConfig;
+          response = await axios.post(
+            geminiEndpoint,
+            {
+              systemInstruction: {
+                parts: [{ text: systemPrompt }],
+              },
+              contents: [
+                {
+                  role: 'user',
+                  parts: [{ text: userPrompt }],
+                },
+              ],
+              generationConfig,
+            },
+            {
+              headers: { 'Content-Type': 'application/json' },
+              httpsAgent: ipv4HttpsAgent,
+              timeout: 45000,
+            }
+          );
+        } else {
+          throw postErr;
         }
-      );
+      }
 
       const parts = response.data?.candidates?.[0]?.content?.parts;
       const rawContent = Array.isArray(parts) ? parts.map((p) => p.text || '').join('') : '';
@@ -625,6 +645,22 @@ Return strictly the JSON object.`;
       );
 
       console.log(`[GapLens AI] Successfully audited using: ${modelToTry}`);
+
+      // Cache successful response (up to MAX_CACHE_ENTRIES)
+      if (analysisCache.size >= MAX_CACHE_ENTRIES) {
+        const oldestKey = analysisCache.keys().next().value;
+        analysisCache.delete(oldestKey);
+      }
+      analysisCache.set(cacheKey, {
+        analysis: normalizedAnalysis,
+        meta: {
+          mode: 'Live Google Gemini AI Engine',
+          modelUsed: modelToTry,
+          attemptedModels,
+          isOfflineDemo: false,
+          sourcesAnalyzed: sources.length,
+        },
+      });
 
       return {
         success: true,
@@ -674,4 +710,6 @@ module.exports = {
   analyzeSourcesWithAI,
   cleanAndParseJSON,
   findPrecomputedMatch,
+  compressSourceForLLM,
+  analysisCache,
 };

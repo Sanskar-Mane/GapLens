@@ -110,12 +110,12 @@ export default function ApiKeyModal({
         onClick={onClose}
       />
 
-      <div className="relative w-full max-w-xl rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-2xl transition-all dark:border-zinc-800 dark:bg-zinc-900 z-10 space-y-5">
+      <div className="relative w-full max-w-xl rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-2xl transition-all dark:border-white/10 dark:bg-zinc-900/90 dark:backdrop-blur-2xl dark:shadow-glass-inset z-10 space-y-5">
 
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-100 pb-3 dark:border-zinc-800">
+        <div className="flex items-center justify-between border-b border-zinc-100 pb-3 dark:border-white/5">
           <div className="flex items-center space-x-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:shadow-glow-indigo">
               <Cpu className="h-4 w-4" />
             </span>
             <div>
@@ -130,14 +130,14 @@ export default function ApiKeyModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+            className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Offline Demo Mode Toggle */}
-        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50 p-3.5 dark:border-zinc-800 dark:bg-zinc-850 flex items-center justify-between">
+        <div className="rounded-xl border border-zinc-200/80 bg-zinc-50 p-3.5 dark:border-white/10 dark:bg-black/30 dark:shadow-glass-inset flex items-center justify-between">
           <div className="space-y-0.5">
             <span className="text-xs font-bold text-zinc-900 dark:text-white block">
               Offline Demo Mode
@@ -170,13 +170,13 @@ export default function ApiKeyModal({
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder={backendHasKey ? 'Server key configured via .env' : 'AIzaSy...'}
-              className="w-full rounded-xl border border-zinc-200/80 bg-zinc-50 py-2.5 pl-3 pr-20 text-xs font-mono text-zinc-900 focus:border-zinc-900 focus:bg-white focus:outline-hidden dark:border-zinc-700 dark:bg-zinc-850 dark:text-zinc-100"
+              className="w-full rounded-xl border border-zinc-200/80 bg-zinc-50 py-2.5 pl-3 pr-20 text-xs font-mono text-zinc-900 focus:border-zinc-900 focus:bg-white focus:outline-hidden dark:border-white/10 dark:bg-black/40 dark:text-zinc-100 dark:placeholder-zinc-600 dark:focus:border-indigo-500/50 dark:focus:ring-1 dark:focus:ring-indigo-500/50 shadow-inner"
             />
             <div className="absolute inset-y-0 right-2 flex items-center space-x-1">
               <button
                 type="button"
                 onClick={() => setShowKey(!showKey)}
-                className="p-1 text-zinc-400 hover:text-zinc-700"
+                className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
               >
                 {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
               </button>
@@ -200,7 +200,7 @@ export default function ApiKeyModal({
             Select Active Model (.env)
           </label>
           {availableModels.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-center text-xs text-zinc-500">
+            <div className="rounded-xl border border-dashed border-zinc-300 dark:border-white/10 p-4 text-center text-xs text-zinc-500">
               No models configured in backend .env. Please set GEMINI_MODEL in backend/.env
             </div>
           ) : (
@@ -213,8 +213,8 @@ export default function ApiKeyModal({
                     type="button"
                     onClick={() => setSelectedModel(m.id)}
                     className={`rounded-xl border p-3 text-left transition-all ${isSelected
-                        ? 'border-zinc-900 bg-zinc-900 text-white dark:border-white dark:bg-white dark:text-zinc-900 shadow-sm'
-                        : 'border-zinc-200/80 bg-zinc-50 text-zinc-700 hover:bg-white dark:border-zinc-800 dark:bg-zinc-850 dark:text-zinc-300 dark:hover:bg-zinc-800'
+                        ? 'border-zinc-900 bg-zinc-900 text-white dark:border-white dark:bg-white dark:text-zinc-900 shadow-sm dark:shadow-glow-indigo'
+                        : 'border-zinc-200/80 bg-zinc-50 text-zinc-700 hover:bg-white dark:border-white/10 dark:bg-black/30 dark:text-zinc-300 dark:hover:border-white/20 dark:hover:bg-zinc-800/50 dark:shadow-glass-inset'
                       }`}
                   >
                     <div className="flex items-center justify-between">
@@ -222,14 +222,14 @@ export default function ApiKeyModal({
                       <span
                         className={`rounded-full px-2 py-0.2 text-[9px] font-semibold ${isSelected
                             ? 'bg-zinc-800 text-zinc-200 dark:bg-zinc-200 dark:text-zinc-800'
-                            : 'bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300'
+                            : 'bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
                           }`}
                       >
                         {m.badge || 'Configured'}
                       </span>
                     </div>
                     <p
-                      className={`mt-1 text-[11px] line-clamp-1 ${isSelected ? 'text-zinc-300 dark:text-zinc-600' : 'text-zinc-400'
+                      className={`mt-1 text-[11px] line-clamp-1 ${isSelected ? 'text-zinc-300 dark:text-zinc-600' : 'text-zinc-400 dark:text-zinc-500'
                         }`}
                     >
                       {m.description}
@@ -245,8 +245,8 @@ export default function ApiKeyModal({
         {testResult && (
           <div
             className={`rounded-xl p-2.5 text-xs flex items-center space-x-2 border ${testResult.success
-                ? 'bg-zinc-50 text-emerald-600 border-zinc-200/60 dark:bg-zinc-850 dark:border-zinc-800'
-                : 'bg-zinc-50 text-rose-600 border-zinc-200/60 dark:bg-zinc-850 dark:border-zinc-800'
+                ? 'bg-zinc-50 text-emerald-600 border-zinc-200/60 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400 dark:shadow-glass-inset'
+                : 'bg-zinc-50 text-rose-600 border-zinc-200/60 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-400 dark:shadow-glass-inset'
               }`}
           >
             {testResult.success ? <Check className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
@@ -255,12 +255,12 @@ export default function ApiKeyModal({
         )}
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between border-t border-zinc-100 pt-3 dark:border-zinc-800">
+        <div className="flex items-center justify-between border-t border-zinc-100 pt-3 dark:border-white/5">
           <button
             type="button"
             disabled={testing}
             onClick={handleTestKey}
-            className="inline-flex items-center space-x-1.5 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-850 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
+            className="inline-flex items-center space-x-1.5 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-800/50 dark:hover:bg-zinc-700/80 dark:text-zinc-300 dark:hover:text-white dark:shadow-glass-inset transition-colors"
           >
             {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <KeyRound className="h-3.5 w-3.5" />}
             <span>Test Connection</span>
@@ -270,14 +270,14 @@ export default function ApiKeyModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl px-3 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-900"
+              className="rounded-xl px-3 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 shadow-soft"
+              className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white dark:hover:shadow-glow-indigo shadow-soft transition-all"
             >
               {saveToast ? 'Saved!' : 'Save & Apply'}
             </button>

@@ -187,12 +187,12 @@ export default function AuthModal({ isOpen, onClose, backendHealth }) {
       />
 
       {/* Modal Dialog Card */}
-      <div className="relative w-full max-w-md rounded-2xl border border-zinc-200/90 bg-white p-6 shadow-2xl transition-all dark:border-zinc-800 dark:bg-zinc-900 z-10 space-y-5">
+      <div className="relative w-full max-w-md rounded-2xl border border-zinc-200/90 bg-white p-6 shadow-2xl transition-all dark:border-white/10 dark:bg-zinc-900/90 dark:backdrop-blur-2xl dark:shadow-glass-inset z-10 space-y-5">
         
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-100 pb-3 dark:border-zinc-800">
+        <div className="flex items-center justify-between border-b border-zinc-100 pb-3 dark:border-white/5">
           <div className="flex items-center space-x-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:shadow-glow-indigo">
               <UserCheck className="h-4 w-4" />
             </span>
             <div>
@@ -201,12 +201,12 @@ export default function AuthModal({ isOpen, onClose, backendHealth }) {
                   {mode === 'login' ? 'Sign In to GapLens' : 'Create GapLens Account'}
                 </h3>
                 {backendHealth?.data?.supabaseConnected === false && (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-500/10 dark:border dark:border-amber-500/20 dark:text-amber-400">
                     Local Fallback
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-zinc-400">
+              <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
                 {mode === 'login'
                   ? 'Access your saved cross-source audits and history'
                   : 'Register with email to synchronize research sessions'}
@@ -224,7 +224,7 @@ export default function AuthModal({ isOpen, onClose, backendHealth }) {
         </div>
 
         {/* Tab Switcher */}
-        <div className="grid grid-cols-2 gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800/80">
+        <div className="grid grid-cols-2 gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-black/40 dark:border dark:border-white/10 dark:shadow-glass-inset">
           <button
             type="button"
             onClick={() => {
@@ -234,7 +234,7 @@ export default function AuthModal({ isOpen, onClose, backendHealth }) {
             }}
             className={`rounded-lg py-1.5 text-xs font-semibold transition-all ${
               mode === 'login'
-                ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-sm'
+                ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 dark:shadow-glow-indigo shadow-sm'
                 : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
             }`}
           >
@@ -249,7 +249,7 @@ export default function AuthModal({ isOpen, onClose, backendHealth }) {
             }}
             className={`rounded-lg py-1.5 text-xs font-semibold transition-all ${
               mode === 'signup'
-                ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-sm'
+                ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 dark:shadow-glow-indigo shadow-sm'
                 : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
             }`}
           >
@@ -259,13 +259,13 @@ export default function AuthModal({ isOpen, onClose, backendHealth }) {
 
         {/* Alert Feedback Messages */}
         {error && (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300 animate-in fade-in duration-150 space-y-2">
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300 animate-in fade-in duration-150 space-y-2 dark:shadow-glass-inset">
             <div className="flex items-start space-x-2">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
               <span className="leading-snug">{error}</span>
             </div>
             {showDemoPrompt && (
-              <div className="pt-2 border-t border-rose-200/60 dark:border-rose-900/40 flex items-center justify-between">
+              <div className="pt-2 border-t border-rose-200/60 dark:border-rose-500/20 flex items-center justify-between">
                 <span className="text-[11px] text-rose-600 dark:text-rose-400">Want to test without credentials?</span>
                 <button
                   type="button"
@@ -280,7 +280,7 @@ export default function AuthModal({ isOpen, onClose, backendHealth }) {
         )}
 
         {successMsg && (
-          <div className="flex items-center space-x-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300 animate-in fade-in duration-150">
+          <div className="flex items-center space-x-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 animate-in fade-in duration-150 dark:shadow-glass-inset">
             <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
             <span>{successMsg}</span>
           </div>
@@ -303,7 +303,7 @@ export default function AuthModal({ isOpen, onClose, backendHealth }) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@example.com"
-                className="w-full rounded-xl border border-zinc-200/90 bg-zinc-50 py-2.5 pl-9 pr-3 text-xs text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:bg-white focus:outline-hidden dark:border-zinc-700 dark:bg-zinc-850 dark:text-zinc-100 dark:focus:border-zinc-100"
+                className="w-full rounded-xl border border-zinc-200/90 bg-zinc-50 py-2.5 pl-9 pr-3 text-xs text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:bg-white focus:outline-hidden dark:border-white/10 dark:bg-black/40 dark:text-zinc-100 dark:placeholder-zinc-600 dark:focus:border-indigo-500/50 dark:focus:ring-1 dark:focus:ring-indigo-500/50 shadow-inner"
               />
             </div>
           </div>
@@ -326,7 +326,7 @@ export default function AuthModal({ isOpen, onClose, backendHealth }) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full rounded-xl border border-zinc-200/90 bg-zinc-50 py-2.5 pl-9 pr-10 text-xs text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:bg-white focus:outline-hidden dark:border-zinc-700 dark:bg-zinc-850 dark:text-zinc-100 dark:focus:border-zinc-100"
+                className="w-full rounded-xl border border-zinc-200/90 bg-zinc-50 py-2.5 pl-9 pr-10 text-xs text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:bg-white focus:outline-hidden dark:border-white/10 dark:bg-black/40 dark:text-zinc-100 dark:placeholder-zinc-600 dark:focus:border-indigo-500/50 dark:focus:ring-1 dark:focus:ring-indigo-500/50 shadow-inner"
               />
               <button
                 type="button"
@@ -342,7 +342,7 @@ export default function AuthModal({ isOpen, onClose, backendHealth }) {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full inline-flex items-center justify-center space-x-2 rounded-xl bg-zinc-900 py-2.5 text-xs font-bold text-white shadow-soft hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 disabled:opacity-50 transition-all cursor-pointer"
+            className="w-full inline-flex items-center justify-center space-x-2 rounded-xl bg-zinc-900 py-2.5 text-xs font-bold text-white shadow-soft hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white dark:hover:shadow-glow-indigo disabled:opacity-50 transition-all cursor-pointer"
           >
             {isLoading ? (
               <>
@@ -357,25 +357,25 @@ export default function AuthModal({ isOpen, onClose, backendHealth }) {
 
         {/* Demo User Fallback Section */}
         <div className="relative flex py-1 items-center">
-          <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
+          <div className="flex-grow border-t border-zinc-200 dark:border-white/10"></div>
           <span className="shrink-0 px-2 text-[10px] font-medium uppercase text-zinc-400">or</span>
-          <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
+          <div className="flex-grow border-t border-zinc-200 dark:border-white/10"></div>
         </div>
 
         <button
           type="button"
           onClick={handleContinueAsDemo}
-          className="w-full inline-flex items-center justify-center space-x-2 rounded-xl border border-zinc-200/80 bg-zinc-50 py-2.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-750 dark:hover:text-white transition-all shadow-soft cursor-pointer"
+          className="w-full inline-flex items-center justify-center space-x-2 rounded-xl border border-zinc-200/80 bg-zinc-50 py-2.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 dark:border-white/10 dark:bg-zinc-800/50 dark:hover:bg-zinc-700/80 dark:text-zinc-300 dark:hover:text-white dark:shadow-glass-inset transition-all shadow-soft cursor-pointer"
         >
           <Sparkles className="h-3.5 w-3.5 text-amber-500" />
           <span>Continue as Demo User</span>
-          <span className="rounded-md bg-zinc-200/70 px-1.5 py-0.5 text-[9px] font-bold text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
+          <span className="rounded-md bg-zinc-200/70 px-1.5 py-0.5 text-[9px] font-bold text-zinc-600 dark:bg-zinc-800 dark:border dark:border-white/10 dark:text-zinc-300">
             Hackathon / Evaluation
           </span>
         </button>
 
         {/* Footer info note */}
-        <div className="text-center pt-2 border-t border-zinc-100 dark:border-zinc-800">
+        <div className="text-center pt-2 border-t border-zinc-100 dark:border-white/5">
           <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
             Backed by Supabase Authentication with seamless local demo persistence.
           </p>

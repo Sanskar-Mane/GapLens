@@ -152,12 +152,12 @@ Official Circular Number Cited: _________________________________________`;
         onClick={onClose}
       />
 
-      <div className="relative w-full max-w-2xl rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-2xl transition-all dark:border-zinc-800 dark:bg-zinc-900 z-10 space-y-4">
+      <div className="relative w-full max-w-2xl rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-2xl transition-all dark:border-white/10 dark:bg-zinc-900/90 dark:backdrop-blur-2xl dark:shadow-glass-inset z-10 space-y-4">
         
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-100 pb-3 dark:border-zinc-800">
+        <div className="flex items-center justify-between border-b border-zinc-100 pb-3 dark:border-white/5">
           <div className="flex items-center space-x-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:shadow-glow-indigo">
               <Mail className="h-4 w-4" />
             </span>
             <div>
@@ -172,7 +172,7 @@ Official Circular Number Cited: _________________________________________`;
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+            className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -180,13 +180,13 @@ Official Circular Number Cited: _________________________________________`;
 
         {/* Format Selector */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 p-1">
+          <div className="flex items-center space-x-1 rounded-xl bg-zinc-100 dark:bg-black/40 dark:border dark:border-white/10 dark:shadow-glass-inset p-1">
             <button
               type="button"
               onClick={() => setInquiryType('email')}
               className={`rounded-lg px-3 py-1 text-xs font-semibold transition-all ${
                 inquiryType === 'email'
-                  ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-sm'
+                  ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 dark:shadow-glow-indigo shadow-sm'
                   : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
               }`}
             >
@@ -197,7 +197,7 @@ Official Circular Number Cited: _________________________________________`;
               onClick={() => setInquiryType('in_person')}
               className={`rounded-lg px-3 py-1 text-xs font-semibold transition-all ${
                 inquiryType === 'in_person'
-                  ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-sm'
+                  ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 dark:shadow-glow-indigo shadow-sm'
                   : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
               }`}
             >
@@ -214,7 +214,7 @@ Official Circular Number Cited: _________________________________________`;
         </div>
 
         {/* Inquiry Text Preview */}
-        <div className="relative rounded-xl border border-zinc-200/80 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-850">
+        <div className="relative rounded-xl border border-zinc-200/80 bg-zinc-50 p-4 dark:border-white/10 dark:bg-black/30 dark:shadow-glass-inset">
           <textarea
             readOnly
             rows={12}
@@ -224,12 +224,12 @@ Official Circular Number Cited: _________________________________________`;
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between border-t border-zinc-100 pt-3 dark:border-zinc-800">
+        <div className="flex items-center justify-between border-t border-zinc-100 pt-3 dark:border-white/5">
           <div className="flex items-center space-x-2">
             <button
               type="button"
               onClick={handleCopy}
-              className="inline-flex items-center space-x-1.5 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-850 dark:text-zinc-300 dark:hover:bg-zinc-800 shadow-soft transition-colors"
+              className="inline-flex items-center space-x-1.5 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-800/50 dark:hover:bg-zinc-700/80 dark:text-zinc-300 dark:hover:text-white dark:shadow-glass-inset shadow-soft transition-colors"
             >
               {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
               <span>{copied ? 'Copied to Clipboard!' : 'Copy to Clipboard'}</span>
@@ -239,7 +239,7 @@ Official Circular Number Cited: _________________________________________`;
               <button
                 type="button"
                 onClick={handleOpenMailClient}
-                className="inline-flex items-center space-x-1.5 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-850 dark:text-zinc-300 dark:hover:bg-zinc-800 shadow-soft transition-colors"
+                className="inline-flex items-center space-x-1.5 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-800/50 dark:hover:bg-zinc-700/80 dark:text-zinc-300 dark:hover:text-white dark:shadow-glass-inset shadow-soft transition-colors"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
                 <span>Open in Email App</span>
@@ -250,7 +250,7 @@ Official Circular Number Cited: _________________________________________`;
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 shadow-soft"
+            className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white dark:hover:shadow-glow-indigo shadow-soft transition-all"
           >
             Close
           </button>

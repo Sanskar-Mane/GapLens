@@ -10,6 +10,7 @@ import {
   Check,
   AlertTriangle,
   ExternalLink,
+  Globe,
 } from 'lucide-react';
 import { extractUrlContent, scanTextMetadata } from '../services/api';
 
@@ -150,10 +151,10 @@ export default function SourceCard({
   };
 
   return (
-    <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-soft dark:border-zinc-800 dark:bg-zinc-900 transition-colors">
+    <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-soft dark:bg-zinc-900/50 dark:backdrop-blur-md dark:border-white/10 dark:shadow-glass-inset transition-colors">
       
       {/* Top Bar: Source ID, Type, Date Status, Upload & Delete */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 dark:border-white/10 pb-3">
         
         {/* Source ID and Type */}
         <div className="flex items-center space-x-2">
@@ -164,16 +165,24 @@ export default function SourceCard({
             {source.id || `src-${index + 1}`}
           </span>
 
+          {/* Auto-discovered web badge */}
+          {source.isAutoDiscovered && (
+            <span className="inline-flex items-center space-x-1 rounded-full bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/20">
+              <Globe className="h-2.5 w-2.5 text-indigo-600 dark:text-indigo-400" />
+              <span>Auto-Discovered Web Source</span>
+            </span>
+          )}
+
           {/* Temporal status dot badge */}
           {temporalInfo.temporalStatus === 'undated' && (
-            <span className="inline-flex items-center space-x-1 rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-700 dark:text-zinc-300 border border-zinc-200/60 dark:border-zinc-700/60">
+            <span className="inline-flex items-center space-x-1 rounded-full bg-zinc-100 dark:bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-zinc-700 dark:text-amber-400 border border-zinc-200/60 dark:border-amber-500/20">
               <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
               <span>Undated</span>
             </span>
           )}
 
           {temporalInfo.temporalStatus === 'outdated' && (
-            <span className="inline-flex items-center space-x-1 rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-700 dark:text-zinc-300 border border-zinc-200/60 dark:border-zinc-700/60">
+            <span className="inline-flex items-center space-x-1 rounded-full bg-zinc-100 dark:bg-rose-500/10 px-2 py-0.5 text-[10px] font-medium text-zinc-700 dark:text-rose-400 border border-zinc-200/60 dark:border-rose-500/20">
               <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
               <span>Outdated Cycle</span>
             </span>
@@ -185,7 +194,7 @@ export default function SourceCard({
           <select
             value={source.sourceType}
             onChange={(e) => handleFieldChange('sourceType', e.target.value)}
-            className="rounded-xl border border-zinc-200/80 bg-zinc-50 px-2.5 py-1 text-xs font-medium text-zinc-800 focus:border-zinc-900 focus:outline-hidden dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+            className="rounded-xl border border-zinc-200/80 bg-zinc-50 px-2.5 py-1 text-xs font-medium text-zinc-800 focus:border-zinc-900 focus:outline-hidden dark:bg-black/40 dark:border-white/10 dark:text-zinc-200 dark:focus:border-indigo-500/50"
           >
             {SOURCE_TYPES.map((type) => (
               <option key={type} value={type}>
@@ -206,7 +215,7 @@ export default function SourceCard({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             title="Upload local .txt or .md document"
-            className="inline-flex items-center space-x-1 rounded-xl border border-zinc-200/80 bg-zinc-50 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-750 transition-colors"
+            className="inline-flex items-center space-x-1 rounded-xl border border-zinc-200/80 bg-zinc-50 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:bg-zinc-800/50 dark:hover:bg-zinc-700/80 dark:border-white/10 dark:text-zinc-300 dark:hover:text-white transition-all"
           >
             <FileUp className="h-3.5 w-3.5 text-zinc-600 dark:text-zinc-400" />
             <span className="hidden sm:inline">Upload File</span>
@@ -247,7 +256,7 @@ export default function SourceCard({
             value={source.title}
             onChange={(e) => handleFieldChange('title', e.target.value)}
             placeholder="Official State Portal"
-            className="w-full rounded-xl border border-zinc-200/80 bg-zinc-50 px-3 py-2 text-xs text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:bg-white focus:outline-hidden font-medium dark:border-zinc-700 dark:bg-zinc-850 dark:text-zinc-100 dark:placeholder-zinc-600 dark:focus:border-white"
+            className="w-full rounded-xl border border-zinc-200/80 bg-zinc-50 px-3 py-2 text-xs text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:bg-white focus:outline-hidden font-medium dark:bg-black/40 dark:border-white/10 dark:text-zinc-100 dark:placeholder-zinc-600 dark:focus:border-indigo-500/50 dark:focus:ring-1 dark:focus:ring-indigo-500/50 shadow-inner transition-all"
           />
         </div>
 
@@ -277,7 +286,7 @@ export default function SourceCard({
             value={source.publishedDate}
             onChange={(e) => handleFieldChange('publishedDate', e.target.value)}
             placeholder="e.g. Sept 2026, 2023, or blank"
-            className="w-full rounded-xl border border-zinc-200/80 bg-zinc-50 px-3 py-2 text-xs font-mono text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:outline-hidden dark:border-zinc-700 dark:bg-zinc-850 dark:text-zinc-100 dark:placeholder-zinc-600 dark:focus:border-white"
+            className="w-full rounded-xl border border-zinc-200/80 bg-zinc-50 px-3 py-2 text-xs font-mono text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:outline-hidden dark:bg-black/40 dark:border-white/10 dark:text-zinc-100 dark:placeholder-zinc-600 dark:focus:border-indigo-500/50 dark:focus:ring-1 dark:focus:ring-indigo-500/50 shadow-inner transition-all"
           />
         </div>
 
@@ -292,7 +301,7 @@ export default function SourceCard({
               value={source.url}
               onChange={(e) => handleFieldChange('url', e.target.value)}
               placeholder="https://..."
-              className="w-full rounded-xl border border-zinc-200/80 bg-zinc-50 px-3 py-2 text-xs font-mono text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:outline-hidden dark:border-zinc-700 dark:bg-zinc-850 dark:text-zinc-100 dark:placeholder-zinc-600 dark:focus:border-white"
+              className="w-full rounded-xl border border-zinc-200/80 bg-zinc-50 px-3 py-2 text-xs font-mono text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:outline-hidden dark:bg-black/40 dark:border-white/10 dark:text-zinc-100 dark:placeholder-zinc-600 dark:focus:border-indigo-500/50 dark:focus:ring-1 dark:focus:ring-indigo-500/50 shadow-inner transition-all"
             />
             <button
               type="button"
@@ -315,14 +324,14 @@ export default function SourceCard({
 
       {/* Extraction Notifications */}
       {extractError && (
-        <div className="mt-2.5 flex items-center space-x-2 rounded-xl bg-zinc-50 p-2 text-xs text-rose-600 border border-zinc-200/60 dark:bg-zinc-850 dark:text-rose-400 dark:border-zinc-800">
+        <div className="mt-2.5 flex items-center space-x-2 rounded-xl bg-zinc-50 p-2 text-xs text-rose-600 border border-zinc-200/60 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
           <span>{extractError}</span>
         </div>
       )}
 
       {extractSuccess && (
-        <div className="mt-2.5 flex items-center space-x-2 rounded-xl bg-zinc-50 p-2 text-xs text-emerald-600 border border-zinc-200/60 dark:bg-zinc-850 dark:text-emerald-400 dark:border-zinc-800">
+        <div className="mt-2.5 flex items-center space-x-2 rounded-xl bg-zinc-50 p-2 text-xs text-emerald-600 border border-zinc-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20">
           <Check className="h-3.5 w-3.5 shrink-0" />
           <span>{extractSuccess}</span>
         </div>
@@ -336,7 +345,7 @@ export default function SourceCard({
               Source Text Extract (Evidence Corpus)
             </label>
             {(source.markdownText || source.plainText) && (
-              <div className="inline-flex rounded-lg border border-zinc-200/80 bg-zinc-100 p-0.5 text-[10px] dark:border-zinc-700 dark:bg-zinc-800">
+              <div className="inline-flex rounded-lg border border-zinc-200/80 bg-zinc-100 p-0.5 text-[10px] dark:border-white/10 dark:bg-black/40">
                 <button
                   type="button"
                   onClick={() => {
@@ -345,7 +354,7 @@ export default function SourceCard({
                   }}
                   className={`rounded-md px-2 py-0.5 font-medium transition-colors ${
                     viewMode === 'markdown'
-                      ? 'bg-white text-zinc-900 shadow-xs dark:bg-zinc-900 dark:text-white'
+                      ? 'bg-white text-zinc-900 shadow-xs dark:bg-zinc-800 dark:text-white'
                       : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
                   }`}
                 >
@@ -359,7 +368,7 @@ export default function SourceCard({
                   }}
                   className={`rounded-md px-2 py-0.5 font-medium transition-colors ${
                     viewMode === 'plain'
-                      ? 'bg-white text-zinc-900 shadow-xs dark:bg-zinc-900 dark:text-white'
+                      ? 'bg-white text-zinc-900 shadow-xs dark:bg-zinc-800 dark:text-white'
                       : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
                   }`}
                 >
@@ -377,7 +386,7 @@ export default function SourceCard({
           value={source.content}
           onChange={(e) => handleFieldChange('content', e.target.value)}
           placeholder="Paste or extract regulatory text, guidelines, conditions, or eligibility criteria here..."
-          className="w-full resize-y rounded-xl border border-zinc-200/80 bg-zinc-50 p-3 text-xs leading-relaxed text-zinc-800 placeholder-zinc-400 focus:border-zinc-900 focus:bg-white focus:outline-hidden dark:border-zinc-700 dark:bg-zinc-850 dark:text-zinc-100 dark:placeholder-zinc-600 dark:focus:border-white transition-all font-mono"
+          className="w-full resize-y rounded-xl border border-zinc-200/80 bg-zinc-50 p-3 text-xs leading-relaxed text-zinc-800 placeholder-zinc-400 focus:border-zinc-900 focus:bg-white focus:outline-hidden dark:bg-black/40 dark:border-white/10 dark:text-zinc-100 dark:placeholder-zinc-600 dark:focus:border-indigo-500/50 dark:focus:ring-1 dark:focus:ring-indigo-500/50 shadow-inner transition-all font-mono"
         />
       </div>
 

@@ -16,9 +16,14 @@ const {
   analyzeSourcesWithAI,
   cleanAndParseJSON,
   findPrecomputedMatch,
+  compressSourceForLLM,
+  analysisCache,
 } = require('../services/aiAnalysisService');
 const sampleScenarios = require('../data/sampleScenarios');
-const { detectTemporalMetadata } = require('../services/scraperService');
+const {
+  detectTemporalMetadata,
+  autoDiscoverAndScrapeSources,
+} = require('../services/scraperService');
 
 console.log('================================================================');
 console.log('  GAPLENS ENGINE VALIDATION TEST SUITE');
@@ -492,6 +497,36 @@ async function executeAllTests() {
   });
 
   // -------------------------------------------------------------
+  // TEST GROUP 5C: AUTONOMOUS RELATIVE WEBSITE DISCOVERY & SCRAPING ENGINE
+  // -------------------------------------------------------------
+  console.log('\n--- GROUP 5C: Autonomous Relative Website Discovery Engine ---');
+
+  await runAsyncTest('autoDiscoverAndScrapeSources returns structured source objects with id, title, url, content, and isAutoDiscovered: true', async () => {
+    const discoveryResult = await autoDiscoverAndScrapeSources({
+      topic: 'Post-Matric Scholarship Scheme 2026',
+      category: 'Education',
+      existingSources: [
+        { id: 'src-1', url: 'https://existing-portal.gov.in/rules', title: 'Existing Portal' },
+      ],
+      maxNewSources: 2,
+    });
+
+    assert(discoveryResult, 'Must return discovery outcome object');
+    assert(Array.isArray(discoveryResult.discoveredSources), 'discoveredSources must be an array');
+    assert(discoveryResult.discoveredSources.length >= 1, 'Must discover at least 1 relative source');
+    assert(Array.isArray(discoveryResult.searchQueriesUsed), 'searchQueriesUsed must be an array');
+    assert.strictEqual(discoveryResult.searchQueriesUsed.length, 2, 'Must formulate 2 targeted queries');
+
+    const firstSrc = discoveryResult.discoveredSources[0];
+    assert(typeof firstSrc.id === 'string' && firstSrc.id.startsWith('src-'), 'Must have sequential id');
+    assert(typeof firstSrc.title === 'string' && firstSrc.title.length > 0, 'Must have title');
+    assert(typeof firstSrc.url === 'string' && firstSrc.url.startsWith('http'), 'Must have valid HTTP URL');
+    assert(typeof firstSrc.content === 'string' && firstSrc.content.length > 20, 'Must have content');
+    assert.strictEqual(firstSrc.isAutoDiscovered, true, 'isAutoDiscovered flag must be true');
+    assert(typeof firstSrc.sourceType === 'string', 'Must classify source type');
+  });
+
+  // -------------------------------------------------------------
   // TEST GROUP 6: AI ANALYSIS SERVICE FAULT TOLERANCE (100% LIVE MODE)
   // -------------------------------------------------------------
   console.log('\n--- GROUP 6: AI Analysis Service Fault Tolerance (100% Live Mode) ---');
@@ -555,6 +590,70 @@ async function executeAllTests() {
     assert(res.informationGaps.length >= 1);
     assert(res.decisionPreMortem, 'Must generate decisionPreMortem');
     assert(res.contradictions[0].precedenceVerdict, 'Must generate precedenceVerdict');
+  });
+
+  // -------------------------------------------------------------
+  // TEST GROUP 6B: PERFORMANCE & 70%+ TOKEN OPTIMIZATION
+  // -------------------------------------------------------------
+  console.log('\n--- GROUP 6B: Performance & Token Optimization Engine ---');
+
+  runTest('compressSourceForLLM strips URLs, normalizes whitespace, and preserves regulatory sentences', () => {
+    const raw = `
+      Welcome to our portal at https://example.gov.in/info.
+      Applicants [click here](https://example.gov.in/portal) to register.
+      Regular welcome greetings and general advice for all prospective candidates in the state.
+      Annual family income must not exceed Rs. 2,50,000 for the 2026 cycle.
+      Mandatory documents include Tehsildar income certificate and Aadhaar verification.
+    `;
+    const compressed = compressSourceForLLM(raw, 250);
+    assert(!compressed.includes('https://'), 'URLs must be stripped');
+    assert(compressed.includes('click here'), 'Anchor text must be preserved');
+    assert(compressed.includes('Rs. 2,50,000'), 'Regulatory currency sentence must be prioritized');
+    assert(compressed.includes('Mandatory documents'), 'Mandatory documents sentence must be prioritized');
+    assert(compressed.length <= 250, 'Must respect maxChars limit');
+  });
+
+  await runAsyncTest('analysisCache returns zero-token cached response for identical audit requests', async () => {
+    const testTopic = 'Rooftop Solar Subsidies 2026';
+    const testCategory = 'Energy';
+    const testSources = [
+      { id: 'src-1', title: 'Solar Notice', content: 'Central subsidy is 40% for up to 3kW installations in 2026.' },
+      { id: 'src-2', title: 'Vendor Guide', content: 'Vendors charge Rs. 50,000 upfront before subsidy claims.' },
+    ];
+
+    const crypto = require('crypto');
+    const cacheKey = crypto
+      .createHash('sha256')
+      .update(
+        JSON.stringify({
+          topic: testTopic.trim().toLowerCase(),
+          category: testCategory,
+          sources: testSources.map((s) => ({
+            id: s.id,
+            title: s.title,
+            date: s.publishedDate,
+            content: (s.content || '').slice(0, 1200),
+          })),
+        })
+      )
+      .digest('hex');
+
+    analysisCache.set(cacheKey, {
+      analysis: { readinessScore: 88, readinessLabel: 'High Readiness' },
+      meta: { mode: 'Live Google Gemini AI Engine', modelUsed: 'gemini-2.5-flash', attemptedModels: ['gemini-2.5-flash'] },
+    });
+
+    const cachedRes = await analyzeSourcesWithAI({
+      topic: testTopic,
+      category: testCategory,
+      sources: testSources,
+      geminiKey: 'dummy-key',
+    });
+
+    assert.strictEqual(cachedRes.success, true);
+    assert.strictEqual(cachedRes.meta.cached, true);
+    assert.strictEqual(cachedRes.meta.tokensSaved, true);
+    assert.strictEqual(cachedRes.analysis.readinessScore, 88);
   });
 
   // -------------------------------------------------------------

@@ -26,16 +26,20 @@ import { patchSessionChecklist } from '../services/api';
 function PriorityDotPill({ priority }) {
   const p = (priority || '').toLowerCase();
   let dotColor = 'bg-zinc-400';
+  let darkClasses = 'dark:bg-zinc-800/60 dark:border-white/10 dark:text-zinc-200';
   if (p.includes('high') || p.includes('critical')) {
     dotColor = 'bg-rose-500';
+    darkClasses = 'dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-400';
   } else if (p.includes('medium')) {
     dotColor = 'bg-amber-500';
-  } else if (p.includes('low')) {
+    darkClasses = 'dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-400';
+  } else if (p.includes('low') || p.includes('standard')) {
     dotColor = 'bg-emerald-500';
+    darkClasses = 'dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400';
   }
 
   return (
-    <span className="inline-flex items-center space-x-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 px-2.5 py-0.5 text-[11px] font-medium text-zinc-800 dark:text-zinc-200 border border-zinc-200/60 dark:border-zinc-700/60 whitespace-nowrap">
+    <span className={`inline-flex items-center space-x-1.5 rounded-full bg-zinc-100 px-2.5 py-0.5 text-[11px] font-medium text-zinc-800 border border-zinc-200/60 whitespace-nowrap ${darkClasses}`}>
       <span className={`h-1.5 w-1.5 rounded-full ${dotColor}`} />
       <span>{priority || 'Standard'}</span>
     </span>
@@ -270,13 +274,13 @@ export default function VerificationChecklistView({
     <div className="space-y-6">
 
       {/* 1. DYNAMIC READINESS SCORE SIMULATOR ROW */}
-      <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-soft dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-soft dark:border-white/10 dark:bg-zinc-900/40 dark:backdrop-blur-xl dark:shadow-glass-inset">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
           
           {/* Dual Score & Metrics */}
           <div className="flex items-center space-x-5">
             <div className="flex items-center space-x-3">
-              <div className="flex h-16 w-16 flex-col items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-850">
+              <div className="flex h-16 w-16 flex-col items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 dark:border-white/10 dark:bg-black/30 dark:shadow-glass-inset">
                 <span className="text-lg font-bold text-zinc-500 dark:text-zinc-400">
                   {baselineScore}
                 </span>
@@ -287,7 +291,7 @@ export default function VerificationChecklistView({
 
               <TrendingUp className="h-4 w-4 text-zinc-400 shrink-0" />
 
-              <div className="flex h-16 w-20 flex-col items-center justify-center rounded-xl border border-zinc-900 bg-zinc-900 text-white dark:border-white dark:bg-white dark:text-zinc-900 shadow-sm">
+              <div className="flex h-16 w-20 flex-col items-center justify-center rounded-xl border border-zinc-900 bg-zinc-900 text-white dark:border-white dark:bg-white dark:text-zinc-900 shadow-sm dark:shadow-glow-indigo">
                 <span className="text-2xl font-black leading-none">
                   {adjustedScore}
                 </span>
@@ -303,7 +307,7 @@ export default function VerificationChecklistView({
                   Live Readiness Recalculation
                 </span>
                 {scoreGain > 0 && (
-                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/10 dark:border dark:border-emerald-500/20 dark:text-emerald-400 border border-emerald-200">
                     +{scoreGain} pts verified
                   </span>
                 )}
@@ -329,8 +333,8 @@ export default function VerificationChecklistView({
         </div>
 
         {/* Horizontal Progress Bar */}
-        <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800 space-y-1.5">
-          <div className="relative h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+        <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-white/5 space-y-1.5">
+          <div className="relative h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-black/40 dark:border dark:border-white/10">
             <div
               className="h-full rounded-full bg-zinc-900 dark:bg-zinc-100 transition-all duration-300 ease-out"
               style={{ width: `${adjustedScore}%` }}
@@ -340,10 +344,10 @@ export default function VerificationChecklistView({
       </div>
 
       {/* 2. TABULAR CHECKLIST CARD ("Task Overview" style from reference UI) */}
-      <div className="rounded-2xl border border-zinc-200/80 bg-white shadow-soft dark:border-zinc-800 dark:bg-zinc-900 overflow-hidden">
+      <div className="rounded-2xl border border-zinc-200/80 bg-white shadow-soft dark:border-white/10 dark:bg-zinc-900/40 dark:backdrop-blur-xl dark:shadow-glass-inset overflow-hidden">
         
         {/* Card Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 border-b border-zinc-100 dark:border-zinc-800">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 border-b border-zinc-100 dark:border-white/5">
           <div>
             <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
               Verification Checklist Overview
@@ -356,7 +360,7 @@ export default function VerificationChecklistView({
           {/* Action and Filter Pills */}
           <div className="flex flex-wrap items-center gap-2 no-print">
             {/* Status Filter Dropdown / Pills */}
-            <div className="flex items-center space-x-1 rounded-lg bg-zinc-100 dark:bg-zinc-800/80 p-0.5">
+            <div className="flex items-center space-x-1 rounded-lg bg-zinc-100 dark:bg-black/40 dark:border dark:border-white/10 dark:shadow-glass-inset p-0.5">
               {[
                 { id: 'all', label: 'All' },
                 { id: 'remaining', label: 'Remaining' },
@@ -368,7 +372,7 @@ export default function VerificationChecklistView({
                   onClick={() => setStatusFilter(tab.id)}
                   className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
                     statusFilter === tab.id
-                      ? 'bg-white text-zinc-900 dark:bg-zinc-900 dark:text-white shadow-xs'
+                      ? 'bg-white text-zinc-900 dark:bg-white dark:text-zinc-900 shadow-xs'
                       : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
                   }`}
                 >
@@ -381,7 +385,7 @@ export default function VerificationChecklistView({
             <button
               type="button"
               onClick={handleCopyReport}
-              className="inline-flex items-center space-x-1.5 rounded-lg border border-zinc-200/80 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors"
+              className="inline-flex items-center space-x-1.5 rounded-lg border border-zinc-200/80 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-800/50 dark:hover:bg-zinc-700/80 dark:text-zinc-300 dark:hover:text-white dark:hover:shadow-glow-indigo dark:shadow-glass-inset transition-all"
               title="Copy brief"
             >
               {copied ? (
@@ -401,7 +405,7 @@ export default function VerificationChecklistView({
             <button
               type="button"
               onClick={handleDownloadMarkdown}
-              className="inline-flex items-center space-x-1.5 rounded-lg border border-zinc-200/80 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors"
+              className="inline-flex items-center space-x-1.5 rounded-lg border border-zinc-200/80 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-800/50 dark:hover:bg-zinc-700/80 dark:text-zinc-300 dark:hover:text-white dark:hover:shadow-glow-indigo dark:shadow-glass-inset transition-all"
               title="Export report as Markdown"
             >
               <FileDown className="h-3.5 w-3.5" />
@@ -412,7 +416,7 @@ export default function VerificationChecklistView({
             <button
               type="button"
               onClick={handlePrint}
-              className="inline-flex items-center space-x-1.5 rounded-lg border border-zinc-200/80 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors"
+              className="inline-flex items-center space-x-1.5 rounded-lg border border-zinc-200/80 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-800/50 dark:hover:bg-zinc-700/80 dark:text-zinc-300 dark:hover:text-white dark:hover:shadow-glow-indigo dark:shadow-glass-inset transition-all"
               title="Print brief"
             >
               <Printer className="h-3.5 w-3.5" />
@@ -425,7 +429,7 @@ export default function VerificationChecklistView({
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-zinc-100 bg-zinc-50/70 text-[11px] font-semibold text-zinc-400 dark:border-zinc-800 dark:bg-zinc-850/50 dark:text-zinc-500">
+              <tr className="border-b border-zinc-100 bg-zinc-50/70 text-[11px] font-semibold text-zinc-400 dark:border-white/5 dark:bg-black/20 dark:text-zinc-400">
                 <th className="py-3 px-4 w-12 text-center">Status</th>
                 <th className="py-3 px-4 min-w-[280px]">Verification Action Item</th>
                 <th className="py-3 px-4 min-w-[180px]">Target Authority</th>
@@ -434,7 +438,7 @@ export default function VerificationChecklistView({
                 <th className="py-3 px-4 w-28 text-right no-print">Inquiry</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+            <tbody className="divide-y divide-zinc-100 dark:divide-white/5">
               {filteredList.map((item, idx) => {
                 const isDone = completedIds.has(item.id);
                 const hasNote = Boolean(verificationNotes[item.id]);
@@ -449,8 +453,8 @@ export default function VerificationChecklistView({
                       onClick={() => toggleCheck(item.id)}
                       className={`cursor-pointer transition-colors ${
                         isDone
-                          ? 'bg-zinc-50/50 dark:bg-zinc-850/20 text-zinc-400 dark:text-zinc-500'
-                          : 'hover:bg-zinc-50/80 dark:hover:bg-zinc-850/40 text-zinc-800 dark:text-zinc-200'
+                          ? 'bg-zinc-50/50 dark:bg-white/[0.02] text-zinc-400 dark:text-zinc-500'
+                          : 'hover:bg-zinc-50/80 dark:hover:bg-white/[0.04] text-zinc-800 dark:text-zinc-200'
                       }`}
                     >
                       {/* Checkbox column */}
@@ -463,8 +467,8 @@ export default function VerificationChecklistView({
                           }}
                           className={`flex h-5 w-5 mx-auto items-center justify-center rounded-md border transition-all ${
                             isDone
-                              ? 'bg-zinc-900 border-zinc-900 text-white dark:bg-white dark:border-white dark:text-zinc-900'
-                              : 'border-zinc-300 dark:border-zinc-700 hover:border-zinc-900'
+                              ? 'bg-zinc-900 border-zinc-900 text-white dark:bg-white dark:border-white dark:text-zinc-900 dark:shadow-glow-indigo'
+                              : 'border-zinc-300 dark:border-white/20 hover:border-zinc-900 dark:hover:border-white/60'
                           }`}
                         >
                           {isDone && <Check className="h-3 w-3 stroke-[3]" />}
@@ -542,7 +546,7 @@ export default function VerificationChecklistView({
 
                     {/* Note Editor Row */}
                     {isEditingNote && (
-                      <tr className="bg-zinc-50 dark:bg-zinc-850" onClick={(e) => e.stopPropagation()}>
+                      <tr className="bg-zinc-50 dark:bg-black/40 dark:border-y dark:border-white/10" onClick={(e) => e.stopPropagation()}>
                         <td colSpan={6} className="p-3 px-4">
                           <div className="flex items-center space-x-2">
                             <input
@@ -550,20 +554,20 @@ export default function VerificationChecklistView({
                               value={tempNoteText}
                               onChange={(e) => setTempNoteText(e.target.value)}
                               placeholder="Record official verification notes (e.g. Inquired with desk, confirmed Nov 30 deadline)..."
-                              className="flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-zinc-900"
+                              className="flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-900 dark:border-white/10 dark:bg-black/50 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-zinc-900 dark:focus:ring-indigo-500/50 dark:focus:border-indigo-500/50 shadow-inner"
                               autoFocus
                             />
                             <button
                               type="button"
                               onClick={handleCancelNote}
-                              className="rounded-lg px-2.5 py-1.5 text-xs text-zinc-500 hover:text-zinc-900"
+                              className="rounded-lg px-2.5 py-1.5 text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
                             >
                               Cancel
                             </button>
                             <button
                               type="button"
                               onClick={(e) => handleSaveNote(e, item.id)}
-                              className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
+                              className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white dark:hover:shadow-glow-indigo"
                             >
                               Save
                             </button>
@@ -589,11 +593,11 @@ export default function VerificationChecklistView({
       </div>
 
       {/* 3. BOTTOM NAVIGATION BAR */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-zinc-200/80 dark:border-zinc-800 no-print">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-zinc-200/80 dark:border-white/10 no-print">
         <button
           type="button"
           onClick={onBackToFindings}
-          className="inline-flex items-center space-x-1.5 rounded-xl border border-zinc-200/80 bg-white px-4 py-2.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors w-full sm:w-auto justify-center"
+          className="inline-flex items-center space-x-1.5 rounded-xl border border-zinc-200/80 bg-white px-4 py-2.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-800/50 dark:hover:bg-zinc-700/80 dark:text-zinc-300 dark:hover:text-white dark:shadow-glass-inset transition-colors w-full sm:w-auto justify-center"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           <span>← Back to Dashboard Findings</span>
@@ -602,7 +606,7 @@ export default function VerificationChecklistView({
         <button
           type="button"
           onClick={onResetResearch}
-          className="inline-flex items-center space-x-2 rounded-xl bg-zinc-900 px-5 py-2.5 text-xs font-semibold text-white shadow-soft hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 transition-all w-full sm:w-auto justify-center"
+          className="inline-flex items-center space-x-2 rounded-xl bg-zinc-900 px-5 py-2.5 text-xs font-semibold text-white shadow-soft hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white dark:hover:shadow-glow-indigo transition-all w-full sm:w-auto justify-center"
         >
           <RotateCcw className="h-3.5 w-3.5" />
           <span>Start New Research Question</span>

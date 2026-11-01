@@ -5,6 +5,7 @@ import MetricCardsRow from './components/MetricCardsRow';
 import SampleLoader from './components/SampleLoader';
 import TopicInput from './components/TopicInput';
 import SourceCollector from './components/SourceCollector';
+import ActionFooter from './components/ActionFooter';
 import AnalysisResultsView from './components/AnalysisResultsView';
 import VerificationChecklistView from './components/VerificationChecklistView';
 import AnalysisLoadingOverlay from './components/AnalysisLoadingOverlay';
@@ -18,6 +19,7 @@ import {
   runAiAnalysis,
   saveResearchSession,
   generateClientDynamicFallback,
+  autoDiscoverWebSources,
   DEFAULT_FREE_MODEL,
 } from './services/api';
 import { FALLBACK_SCENARIOS, FALLBACK_ANALYSES } from './data/fallbackScenarios';
@@ -83,6 +85,11 @@ function MainApp() {
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisMeta, setAnalysisMeta] = useState(null);
   const [validationError, setValidationError] = useState(null);
+
+  // Autonomous Relative Web Discovery State
+  const [autoDiscoverWeb, setAutoDiscoverWeb] = useState(true);
+  const [isAutoDiscovering, setIsAutoDiscovering] = useState(false);
+  const [discoveryNotice, setDiscoveryNotice] = useState(null);
 
   // One-time scrubber on mount to eliminate legacy invalid model slugs
   useEffect(() => {
@@ -263,15 +270,133 @@ function MainApp() {
     setCurrentStep(2);
   };
 
+  // 7b. Autonomous Relative Web Discovery Handler
+  const handleAutoDiscoverSources = async () => {
+    if (!topic || !topic.trim()) {
+      setValidationError('Please define your research question or goal before scanning relative websites.');
+      return;
+    }
+    setValidationError(null);
+    setIsAutoDiscovering(true);
+
+    try {
+      const maxNew = Math.max(1, Math.min(3, 6 - sources.length));
+      const res = await autoDiscoverWebSources({
+        topic: topic.trim(),
+        category,
+        existingSources: sources,
+        maxNewSources: maxNew,
+      });
+
+      if (res && Array.isArray(res.discoveredSources) && res.discoveredSources.length > 0) {
+        const existingUrls = new Set(sources.map((s) => s.url).filter(Boolean));
+        const newSources = res.discoveredSources.filter((s) => !existingUrls.has(s.url));
+
+        if (newSources.length > 0) {
+          const merged = [...sources, ...newSources].slice(0, 6).map((s, idx) => ({
+            ...s,
+            id: `src-${idx + 1}`,
+          }));
+          setSources(merged);
+          setDiscoveryNotice({
+            type: 'success',
+            title: 'Autonomous Web Discovery Complete',
+            message: `Scraped ${newSources.length} relative website${newSources.length > 1 ? 's' : ''} for your topic.`,
+          });
+          setTimeout(() => setDiscoveryNotice(null), 5000);
+        } else {
+          setDiscoveryNotice({
+            type: 'success',
+            title: 'Sources Up-to-Date',
+            message: 'Relevant relative websites for this topic are already loaded.',
+          });
+          setTimeout(() => setDiscoveryNotice(null), 4000);
+        }
+      } else {
+        setDiscoveryNotice({
+          type: 'success',
+          title: 'Web Scan Complete',
+          message: 'No additional relative websites found.',
+        });
+        setTimeout(() => setDiscoveryNotice(null), 4000);
+      }
+    } catch (err) {
+      console.warn('[Auto-Discovery Error]', err);
+      setValidationError(`Failed to auto-discover relative websites: ${err.message}`);
+    } finally {
+      setIsAutoDiscovering(false);
+    }
+  };
+
+  // 7c. Targeted Web Discovery for Specific Information Gap
+  const handleResolveGapWithWeb = async (gap) => {
+    if (!gap) return;
+    setIsAnalyzing(true);
+    setValidationError(null);
+
+    try {
+      const gapQuery = `${topic} ${gap.missingQuestion || gap.title || ''}`.trim();
+      const res = await autoDiscoverWebSources({
+        topic: gapQuery,
+        category,
+        existingSources: sources,
+        maxNewSources: 1,
+      });
+
+      let updatedSources = [...sources];
+      if (res && Array.isArray(res.discoveredSources) && res.discoveredSources.length > 0) {
+        const newSrc = res.discoveredSources[0];
+        const existingUrls = new Set(sources.map((s) => s.url).filter(Boolean));
+        if (!existingUrls.has(newSrc.url)) {
+          updatedSources = [...sources, newSrc].slice(0, 6).map((s, idx) => ({
+            ...s,
+            id: `src-${idx + 1}`,
+          }));
+          setSources(updatedSources);
+        }
+      }
+
+      // Re-run AI analysis with updated sources
+      const payload = {
+        topic: topic.trim(),
+        category,
+        sources: updatedSources.filter((s) => s.content && s.content.trim().length >= 10),
+        autoDiscoverWeb: false,
+        geminiKey: forceOfflineDemo ? '' : openRouterKey,
+        openRouterKey: forceOfflineDemo ? '' : openRouterKey,
+        model: activeModel,
+        forceDemoMode: forceOfflineDemo,
+      };
+
+      const result = await runAiAnalysis(payload);
+      if (result && result.analysis) {
+        setAnalysisResult(result.analysis);
+        setAnalysisMeta(result.meta || {});
+        if (result.sources) setSources(result.sources);
+      }
+    } catch (err) {
+      console.warn('[Gap Web Resolution Error]', err);
+      setValidationError(`Could not resolve gap via web search: ${err.message}`);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   // 8. Navigation: Step 2 -> Step 3 Trigger AI Analysis
   const handleRunAnalysis = async () => {
+    if (!topic || !topic.trim()) {
+      setValidationError('Please define your research question or select a scenario before proceeding.');
+      return;
+    }
+
     const validSources = sources.filter(
       (s) => s && s.content && s.content.trim().length >= 10
     );
 
-    if (validSources.length < 2) {
+    // Only block if user provided < 2 sources AND auto-discovery is disabled
+    if (validSources.length < 2 && !autoDiscoverWeb) {
       setValidationError(
-        `At least 2 sources must contain meaningful text (currently ${validSources.length} valid). Please paste text or extract content via URL.`
+        `At least 2 sources must contain meaningful text (currently ${validSources.length} valid). Please paste text or enable "Auto-Scan Relative Websites".`
       );
       return;
     }
@@ -284,6 +409,7 @@ function MainApp() {
         topic: topic.trim(),
         category,
         sources: validSources,
+        autoDiscoverWeb,
         geminiKey: forceOfflineDemo ? '' : openRouterKey,
         openRouterKey: forceOfflineDemo ? '' : openRouterKey,
         model: activeModel,
@@ -296,6 +422,12 @@ function MainApp() {
         setAnalysisResult(result.analysis);
         setAnalysisMeta(result.meta || {});
 
+        // If newly auto-discovered sources returned, update state so Step 2 & Step 3 inspector have them
+        const combinedSourcesList = Array.isArray(result.sources) && result.sources.length > 0
+          ? result.sources
+          : validSources;
+        setSources(combinedSourcesList);
+
         if (result.meta?.sessionId) {
           setCurrentSessionId(result.meta.sessionId);
         }
@@ -304,7 +436,7 @@ function MainApp() {
         saveResearchSession({
           topic: topic.trim(),
           category,
-          sources: validSources,
+          sources: combinedSourcesList,
           modelUsed: result.meta?.modelUsed || activeModel,
           analysisResult: result.analysis,
           user_id: user?.id,
@@ -409,15 +541,15 @@ function MainApp() {
 
         {/* Validation Alert Banner */}
         {validationError && (
-          <div className="flex items-center justify-between rounded-2xl border border-zinc-200/80 bg-white p-4 text-xs text-rose-600 dark:border-zinc-800 dark:bg-zinc-900 shadow-soft animate-in fade-in duration-200">
+          <div className="flex items-center justify-between rounded-2xl border border-zinc-200/80 bg-white p-4 text-xs text-rose-600 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-400 dark:backdrop-blur-md dark:shadow-glass-inset shadow-soft animate-in fade-in duration-200">
             <div className="flex items-center space-x-2">
-              <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+              <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
               <span className="font-medium">{validationError}</span>
             </div>
             <button
               type="button"
               onClick={() => setValidationError(null)}
-              className="font-bold underline ml-2"
+              className="font-bold underline ml-2 hover:opacity-80 cursor-pointer"
             >
               Dismiss
             </button>
@@ -450,6 +582,9 @@ function MainApp() {
                 setActiveScenarioId(null);
               }}
               onReset={handleResetWorkspace}
+              autoDiscoverWeb={autoDiscoverWeb}
+              onToggleAutoDiscover={setAutoDiscoverWeb}
+              onAutoDiscoverSources={handleAutoDiscoverSources}
             />
 
             {/* Bottom Navigation for Step 1 */}
@@ -457,7 +592,7 @@ function MainApp() {
               <button
                 type="button"
                 onClick={handleProceedToSources}
-                className="inline-flex items-center space-x-2 rounded-xl bg-zinc-900 px-6 py-3 text-xs font-bold text-white shadow-soft hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 transition-all hover:scale-[1.01]"
+                className="inline-flex items-center space-x-2 rounded-xl bg-zinc-900 px-6 py-3 text-xs font-bold text-white shadow-soft hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white dark:hover:shadow-glow-indigo transition-all hover:scale-[1.01]"
               >
                 <span>Next: Review &amp; Add Sources</span>
                 <ArrowRight className="h-4 w-4" />
@@ -474,14 +609,14 @@ function MainApp() {
           <div className="space-y-6 animate-in fade-in duration-150">
             
             {/* Compact Header reminding user of selected Goal */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-soft dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-soft dark:border-white/10 dark:bg-zinc-900/40 dark:backdrop-blur-xl dark:shadow-glass-inset">
               <div className="flex items-start sm:items-center space-x-3">
-                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-bold text-xs shrink-0 mt-0.5 sm:mt-0">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:shadow-glow-indigo font-bold text-xs shrink-0 mt-0.5 sm:mt-0">
                   Goal
                 </span>
                 <div>
                   <div className="flex items-center space-x-2">
-                    <span className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-bold text-zinc-700 dark:text-zinc-300">
+                    <span className="rounded-full bg-zinc-100 dark:bg-zinc-800/80 dark:border dark:border-white/10 px-2 py-0.5 text-[10px] font-bold text-zinc-700 dark:text-zinc-300">
                       {category}
                     </span>
                     <span className="text-xs text-zinc-400">
@@ -497,7 +632,7 @@ function MainApp() {
               <button
                 type="button"
                 onClick={() => setCurrentStep(1)}
-                className="inline-flex items-center space-x-1.5 rounded-xl border border-zinc-200/80 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-850 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors shrink-0 self-start sm:self-auto"
+                className="inline-flex items-center space-x-1.5 rounded-xl border border-zinc-200/80 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-800/50 dark:hover:bg-zinc-700/80 dark:text-zinc-300 dark:hover:text-white dark:shadow-glass-inset dark:hover:shadow-glow-indigo transition-all shrink-0 self-start sm:self-auto"
               >
                 <Edit3 className="h-3.5 w-3.5" />
                 <span>Edit Goal</span>
@@ -510,27 +645,42 @@ function MainApp() {
               onAddSource={handleAddSource}
               onUpdateSource={handleUpdateSource}
               onDeleteSource={handleDeleteSource}
+              onAutoDiscoverSources={handleAutoDiscoverSources}
+              isAutoDiscovering={isAutoDiscovering}
             />
 
-            {/* Bottom Navigation for Step 2 */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-zinc-200/80 dark:border-zinc-800">
+            {/* ActionFooter with Validation Badges, Model Status & Auto-Scan Switch */}
+            <ActionFooter
+              topic={topic}
+              sources={sources}
+              activeModel={activeModel}
+              hasOpenRouterKey={Boolean(
+                openRouterKey ||
+                backendHealth?.data?.hasServerGeminiKey ||
+                backendHealth?.data?.hasServerOpenRouterKey
+              )}
+              hasGeminiKey={Boolean(
+                openRouterKey ||
+                backendHealth?.data?.hasServerGeminiKey ||
+                backendHealth?.data?.hasServerOpenRouterKey
+              )}
+              forceOfflineDemo={forceOfflineDemo}
+              isAnalyzing={isAnalyzing}
+              autoDiscoverWeb={autoDiscoverWeb}
+              onToggleAutoDiscover={setAutoDiscoverWeb}
+              onTriggerAnalysis={handleRunAnalysis}
+              analysisNotice={discoveryNotice}
+            />
+
+            {/* Back Navigation for Step 2 */}
+            <div className="flex items-center justify-start pt-1">
               <button
                 type="button"
                 onClick={() => setCurrentStep(1)}
-                className="inline-flex items-center space-x-1.5 rounded-xl border border-zinc-200/80 bg-white px-4 py-2.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors w-full sm:w-auto justify-center"
+                className="inline-flex items-center space-x-1.5 rounded-xl border border-zinc-200/80 bg-white px-4 py-2.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-800/50 dark:hover:bg-zinc-700/80 dark:text-zinc-300 dark:hover:text-white dark:shadow-glass-inset transition-colors"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 <span>← Back to Goal</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleRunAnalysis}
-                disabled={isAnalyzing}
-                className="inline-flex items-center space-x-2 rounded-xl bg-zinc-900 px-6 py-2.5 text-xs font-bold text-white shadow-soft hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 disabled:opacity-50 transition-all w-full sm:w-auto justify-center"
-              >
-                <Sparkles className="h-4 w-4" />
-                <span>Run AI Gap &amp; Conflict Analysis →</span>
               </button>
             </div>
 
@@ -548,6 +698,8 @@ function MainApp() {
               sources={sources}
               onBackToSources={() => setCurrentStep(2)}
               onProceedToChecklist={() => setCurrentStep(4)}
+              onResolveGapWeb={handleResolveGapWithWeb}
+              isResolvingGap={isAnalyzing}
             />
           </div>
         )}

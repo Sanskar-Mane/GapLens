@@ -35,19 +35,19 @@ export default function SampleLoader({ scenarios, onSelectScenario, activeScenar
   };
 
   return (
-    <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 sm:p-5 shadow-soft dark:border-zinc-800 dark:bg-zinc-900 transition-colors">
+    <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 sm:p-5 shadow-soft dark:border-white/10 dark:bg-zinc-900/40 dark:backdrop-blur-xl dark:shadow-glass-inset transition-colors">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         
         {/* Left explanation */}
         <div className="space-y-1">
           <div className="flex items-center space-x-2">
-            <span className="flex h-5 w-5 items-center justify-center rounded-md bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900">
+            <span className="flex h-5 w-5 items-center justify-center rounded-md bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:shadow-glow-indigo">
               <Sparkles className="h-3 w-3" />
             </span>
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-900 dark:text-white">
               Pre-Configured Evaluation Scenarios
             </span>
-            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600 dark:bg-zinc-800/80 dark:border dark:border-white/10 dark:text-zinc-400">
               3 Test Sets
             </span>
           </div>
@@ -69,8 +69,8 @@ export default function SampleLoader({ scenarios, onSelectScenario, activeScenar
                 onClick={() => handleSelect(scenario)}
                 className={`group relative flex flex-col justify-between rounded-xl border p-3 text-left transition-all ${
                   isActive
-                    ? 'border-zinc-900 bg-zinc-900 text-white dark:border-white dark:bg-white dark:text-zinc-900 shadow-sm'
-                    : 'border-zinc-200/80 bg-zinc-50 text-zinc-700 hover:border-zinc-300 hover:bg-white dark:border-zinc-800 dark:bg-zinc-850/60 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:bg-zinc-800'
+                    ? 'border-zinc-900 bg-zinc-900 text-white dark:border-white dark:bg-white dark:text-zinc-900 shadow-sm dark:shadow-glow-indigo'
+                    : 'border-zinc-200/80 bg-zinc-50 text-zinc-700 hover:border-zinc-300 hover:bg-white dark:border-white/10 dark:bg-black/30 dark:text-zinc-300 dark:hover:border-white/20 dark:hover:bg-zinc-800/50 dark:shadow-glass-inset'
                 }`}
               >
                 <div className="flex items-start space-x-2.5">
@@ -78,7 +78,7 @@ export default function SampleLoader({ scenarios, onSelectScenario, activeScenar
                     className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg mt-0.5 ${
                       isActive
                         ? 'bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900'
-                        : 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
+                        : 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800/80 dark:border dark:border-white/10 dark:text-zinc-300'
                     }`}
                   >
                     <Icon className="h-3.5 w-3.5" />

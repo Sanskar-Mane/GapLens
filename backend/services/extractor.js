@@ -122,7 +122,7 @@ const ipv4HttpsAgent = new https.Agent({
   rejectUnauthorized: false, // Prevents failures on government sites with incomplete cert chains
 });
 
-// 2. Initialized Turndown service for clean GitHub Flavored / CommonMark Markdown
+// 2. Initialized Turndown service for clean, token-lean GitHub Flavored Markdown
 const turndownService = new TurndownService({
   headingStyle: 'atx',
   codeBlockStyle: 'fenced',
@@ -131,15 +131,20 @@ const turndownService = new TurndownService({
   strongDelimiter: '**',
 });
 
-// Clean up links and images in turndown
+// Remove media, tracking, and redundant structural tags completely from Markdown
+turndownService.remove(['img', 'svg', 'picture', 'figure', 'canvas', 'script', 'style', 'nav', 'footer', 'aside', 'noscript', 'iframe']);
+
+// Clean up links in turndown: strip empty links, javascript:, or data URIs
 turndownService.addRule('cleanLinks', {
   filter: 'a',
   replacement: function (content, node) {
-    const href = node.getAttribute('href');
-    if (!href || href.startsWith('javascript:') || href === '#') {
-      return content;
+    const trimmed = (content || '').trim();
+    if (!trimmed) return '';
+    const href = node.getAttribute('href') || '';
+    if (!href || href.startsWith('javascript:') || href.startsWith('data:') || href === '#') {
+      return trimmed;
     }
-    return `[${content}](${href})`;
+    return `[${trimmed}](${href})`;
   },
 });
 

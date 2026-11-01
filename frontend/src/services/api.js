@@ -224,6 +224,37 @@ export const searchWebSources = async (query) => {
 };
 
 /**
+ * Autonomous Relative Website Discovery & Live Scraping
+ */
+export const autoDiscoverWebSources = async ({
+  topic,
+  category = 'General',
+  existingSources = [],
+  maxNewSources = 3,
+}) => {
+  try {
+    const res = await apiClient.post('/auto-discover', {
+      topic,
+      category,
+      existingSources,
+      maxNewSources,
+    });
+    return res.data;
+  } catch (err) {
+    console.error('[GapLens API] /api/auto-discover error:', err.message);
+    const serverMessage =
+      err.response?.data?.message ||
+      err.response?.data?.error ||
+      err.message ||
+      'Autonomous web discovery failed.';
+    const errorToThrow = new Error(serverMessage);
+    errorToThrow.status = err.response?.status;
+    errorToThrow.response = err.response;
+    throw errorToThrow;
+  }
+};
+
+/**
  * Scan raw text for academic cycles, explicit dates, and temporal status
  */
 export const scanTextMetadata = async (content, publishedDate = '') => {
@@ -652,6 +683,7 @@ export const runAiAnalysis = async (payload) => {
     openRouterKey: forceOffline ? '' : (clientKey || payload.geminiKey || payload.openRouterKey || ''),
     model: clientModel || payload.model || '',
     forceDemoMode: forceOffline || payload.forceDemoMode,
+    autoDiscoverWeb: payload.autoDiscoverWeb !== undefined ? payload.autoDiscoverWeb : true,
   };
 
   try {

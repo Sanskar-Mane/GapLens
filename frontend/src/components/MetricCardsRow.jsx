@@ -55,14 +55,14 @@ export default function MetricCardsRow({
         return (
           <div
             key={idx}
-            className="rounded-2xl border border-zinc-200/90 bg-white p-5 shadow-soft transition-all hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
+            className="rounded-2xl border border-zinc-200/90 bg-white p-5 shadow-soft hover:border-zinc-300 dark:bg-gradient-to-b dark:from-zinc-800/40 dark:to-zinc-900/60 dark:backdrop-blur-md dark:border-white/10 dark:shadow-glass-inset dark:hover:border-white/20 dark:hover:shadow-glow-indigo transition-all duration-300"
           >
             {/* Top row: Title on left, minimal outlined icon on right */}
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 {m.title}
               </span>
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-200/60 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/80 text-zinc-500 dark:text-zinc-400">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-200/60 bg-zinc-50 dark:border-white/10 dark:bg-zinc-800/60 text-zinc-500 dark:text-zinc-300">
                 <Icon className="h-3.5 w-3.5" />
               </div>
             </div>

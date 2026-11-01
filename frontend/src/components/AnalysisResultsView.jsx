@@ -18,6 +18,8 @@ import {
   Scale,
   ChevronDown,
   ChevronUp,
+  Globe,
+  Loader2,
 } from 'lucide-react';
 import SourceInspectorDrawer from './SourceInspectorDrawer';
 
@@ -43,16 +45,20 @@ function SegmentedTickBar({ percentage = 75, totalTicks = 16 }) {
 // Subtle Semantic Status Pill with Dot
 function StatusDotPill({ status, label }) {
   let dotColor = 'bg-zinc-400';
+  let darkClasses = 'dark:bg-zinc-800/60 dark:border-white/10 dark:text-zinc-300';
   const lower = (status || label || '').toLowerCase();
-  if (lower.includes('verified') || lower.includes('low') || lower.includes('pass')) {
+  if (lower.includes('verified') || lower.includes('low') || lower.includes('pass') || lower.includes('corroborated')) {
     dotColor = 'bg-emerald-500';
-  } else if (lower.includes('medium') || lower.includes('moderate') || lower.includes('warning')) {
+    darkClasses = 'dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400';
+  } else if (lower.includes('medium') || lower.includes('moderate') || lower.includes('warning') || lower.includes('date')) {
     dotColor = 'bg-amber-500';
-  } else if (lower.includes('high') || lower.includes('critical') || lower.includes('conflict') || lower.includes('missing')) {
+    darkClasses = 'dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-400';
+  } else if (lower.includes('high') || lower.includes('critical') || lower.includes('conflict') || lower.includes('missing') || lower.includes('severe')) {
     dotColor = 'bg-rose-500';
+    darkClasses = 'dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-400';
   }
   return (
-    <span className="inline-flex items-center space-x-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 px-3 py-1 text-xs font-medium text-zinc-800 dark:text-zinc-200 border border-zinc-200/50 dark:border-zinc-700/50">
+    <span className={`inline-flex items-center space-x-1.5 rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-800 border border-zinc-200/50 ${darkClasses}`}>
       <span className={`h-1.5 w-1.5 rounded-full ${dotColor}`} />
       <span>{label || status}</span>
     </span>
@@ -65,9 +71,12 @@ export default function AnalysisResultsView({
   sources = [],
   onBackToSources,
   onProceedToChecklist,
+  onResolveGapWeb,
+  isResolvingGap = false,
 }) {
   const [activeTab, setActiveTab] = useState('gaps'); // 'gaps' | 'conflicts' | 'outdated' | 'facts'
   const [isPreMortemExpanded, setIsPreMortemExpanded] = useState(true);
+  const [resolvingGapId, setResolvingGapId] = useState(null);
 
   // Source Inspector Drawer state
   const [inspectorState, setInspectorState] = useState({
@@ -90,7 +99,7 @@ export default function AnalysisResultsView({
 
   if (!analysis) {
     return (
-      <div className="rounded-2xl border border-zinc-200/80 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-900 shadow-soft">
+      <div className="rounded-2xl border border-zinc-200/80 bg-white p-8 text-center dark:border-white/10 dark:bg-zinc-900/40 dark:backdrop-blur-xl dark:shadow-glass-inset shadow-soft">
         <Sparkles className="mx-auto h-8 w-8 text-zinc-400 animate-pulse" />
         <h3 className="mt-3 text-base font-bold text-zinc-900 dark:text-white">
           No Analysis Results Available
@@ -101,7 +110,7 @@ export default function AnalysisResultsView({
         <button
           type="button"
           onClick={onBackToSources}
-          className="mt-4 inline-flex items-center space-x-1.5 rounded-xl bg-zinc-900 px-4 py-2 text-xs font-semibold text-white shadow-soft hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
+          className="mt-4 inline-flex items-center space-x-1.5 rounded-xl bg-zinc-900 px-4 py-2 text-xs font-semibold text-white shadow-soft hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white dark:hover:shadow-glow-indigo transition-all"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           <span>Back to Sources</span>
@@ -240,24 +249,24 @@ export default function AnalysisResultsView({
     <div className="space-y-6">
 
       {/* 1. TOP EXECUTIVE SUMMARY & AI META BANNER */}
-      <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-soft dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800/80 pb-3">
+      <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-soft dark:border-white/10 dark:bg-zinc-900/40 dark:backdrop-blur-xl dark:shadow-glass-inset">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-zinc-100 dark:border-white/5 pb-3">
           <div className="flex items-center space-x-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
               Audit Findings
             </span>
-            <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-[11px] font-mono font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+            <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-[11px] font-mono font-medium text-zinc-700 dark:bg-zinc-800/80 dark:border dark:border-white/10 dark:text-zinc-300">
               {meta?.modelUsed || 'AI Audit Engine'}
             </span>
             {meta?.isOfflineDemo && (
-              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 dark:bg-zinc-800/80 dark:border dark:border-white/10 dark:text-zinc-400">
                 Offline Mode
               </span>
             )}
           </div>
 
-          <div className="flex items-center space-x-2 text-xs text-zinc-500">
-            <span className="h-2 w-2 rounded-full bg-zinc-900 dark:bg-white" />
+          <div className="flex items-center space-x-2 text-xs text-zinc-500 dark:text-zinc-400">
+            <span className="h-2 w-2 rounded-full bg-zinc-900 dark:bg-indigo-400 dark:shadow-glow-indigo" />
             <span>2026 Regulatory Baseline</span>
           </div>
         </div>
@@ -270,7 +279,7 @@ export default function AnalysisResultsView({
         )}
 
         {meta?.fallbackNotice && (
-          <div className="mt-3 flex items-start space-x-2 rounded-xl bg-zinc-50 p-2.5 text-[11px] text-zinc-600 border border-zinc-200/60 dark:bg-zinc-850 dark:text-zinc-400 dark:border-zinc-800">
+          <div className="mt-3 flex items-start space-x-2 rounded-xl bg-zinc-50 p-2.5 text-[11px] text-zinc-600 border border-zinc-200/60 dark:bg-black/30 dark:text-zinc-400 dark:border-white/10 dark:shadow-glass-inset">
             <Info className="h-3.5 w-3.5 text-zinc-500 shrink-0 mt-0.5" />
             <span>{meta.fallbackNotice}</span>
           </div>
@@ -279,10 +288,10 @@ export default function AnalysisResultsView({
 
       {/* 2. PRE-MORTEM DECISION RISK SIMULATOR BANNER */}
       {preMortemData && (
-        <div className="rounded-2xl border border-zinc-200/90 bg-white p-5 shadow-soft dark:border-zinc-800 dark:bg-zinc-900 transition-colors">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800/80 pb-3">
+        <div className="rounded-2xl border border-zinc-200/90 bg-white p-5 shadow-soft dark:border-white/10 dark:bg-zinc-900/40 dark:backdrop-blur-xl dark:shadow-glass-inset transition-colors">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-zinc-100 dark:border-white/5 pb-3">
             <div className="flex items-center space-x-2.5">
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shrink-0">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-900 text-white dark:bg-rose-500/10 dark:border dark:border-rose-500/20 dark:text-rose-400 dark:shadow-glow-rose shrink-0">
                 <ShieldAlert className="h-4 w-4" />
               </span>
               <div>
@@ -290,7 +299,7 @@ export default function AnalysisResultsView({
                   <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
                     Pre-Mortem Decision Risk Simulator
                   </h3>
-                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 dark:bg-zinc-800/80 dark:border dark:border-white/10 dark:text-zinc-400">
                     Forward Impact Simulation
                   </span>
                 </div>
@@ -307,8 +316,8 @@ export default function AnalysisResultsView({
                 label={preMortemData.overallRiskLevel || 'High Risk'}
               />
               {/* Estimated Delay Pill */}
-              <span className="inline-flex items-center space-x-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 px-3 py-1 text-xs font-semibold text-zinc-700 dark:text-zinc-300 border border-zinc-200/60 dark:border-zinc-700/60">
-                <Clock className="h-3.5 w-3.5 text-zinc-500" />
+              <span className="inline-flex items-center space-x-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800/60 px-3 py-1 text-xs font-semibold text-zinc-700 dark:text-zinc-300 border border-zinc-200/60 dark:border-white/10 dark:shadow-glass-inset">
+                <Clock className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
                 <span>{preMortemData.estimatedDelay || '30 to 60 Days Delay'}</span>
               </span>
               {/* Expand/Collapse Toggle */}
@@ -340,7 +349,7 @@ export default function AnalysisResultsView({
           {isPreMortemExpanded &&
             Array.isArray(preMortemData.criticalFailurePoints) &&
             preMortemData.criticalFailurePoints.length > 0 && (
-              <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800/80">
+              <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-white/5">
                 <h4 className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-2.5">
                   Critical Failure Points &amp; Statutory Penalties
                 </h4>
@@ -348,11 +357,11 @@ export default function AnalysisResultsView({
                   {preMortemData.criticalFailurePoints.map((pt, idx) => (
                     <div
                       key={idx}
-                      className="rounded-xl border border-zinc-200/80 bg-zinc-50/70 p-3.5 dark:border-zinc-800 dark:bg-zinc-850/60 flex flex-col justify-between"
+                      className="rounded-xl border border-zinc-200/80 bg-zinc-50/70 p-3.5 dark:border-white/10 dark:bg-black/30 dark:shadow-glass-inset flex flex-col justify-between"
                     >
                       <div>
                         <div className="flex items-center justify-between gap-1.5 mb-1.5">
-                          <span className="font-mono text-[10px] font-bold rounded bg-zinc-200/80 dark:bg-zinc-800 px-1.5 py-0.5 text-zinc-800 dark:text-zinc-200">
+                          <span className="font-mono text-[10px] font-bold rounded bg-zinc-200/80 dark:bg-zinc-800 dark:border dark:border-white/10 px-1.5 py-0.5 text-zinc-800 dark:text-zinc-200">
                             {pt.darkSpotRef}
                           </span>
                           <span className="text-[10px] font-medium text-rose-600 dark:text-rose-400 flex items-center space-x-1">
@@ -364,7 +373,7 @@ export default function AnalysisResultsView({
                           {pt.failureScenario}
                         </p>
                       </div>
-                      <div className="mt-2.5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800 text-[11px] text-zinc-600 dark:text-zinc-400">
+                      <div className="mt-2.5 pt-2 border-t border-zinc-200/60 dark:border-white/10 text-[11px] text-zinc-600 dark:text-zinc-400">
                         <strong className="text-zinc-900 dark:text-zinc-200 font-semibold">Penalty / Loss: </strong>
                         {pt.penaltyOrLoss}
                       </div>
@@ -383,10 +392,10 @@ export default function AnalysisResultsView({
         {/* LEFT MAIN CARD (8 COLS): CROSS-SOURCE FINDINGS & RUBRIC BREAKDOWN */}
         {/* ================================================================= */}
         <div className="lg:col-span-8 space-y-6">
-          <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-soft dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-soft dark:border-white/10 dark:bg-zinc-900/40 dark:backdrop-blur-xl dark:shadow-glass-inset">
             
             {/* Top Sub-Tab Filter Pills */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 dark:border-white/5 pb-4">
               <div>
                 <h3 className="text-sm font-bold text-zinc-900 dark:text-white">
                   Cross-Source Findings
@@ -397,7 +406,7 @@ export default function AnalysisResultsView({
               </div>
 
               {/* Segmented Filter Pills */}
-              <div className="flex items-center space-x-1 rounded-xl bg-zinc-100 dark:bg-zinc-800/80 p-1">
+              <div className="flex items-center space-x-1 rounded-xl bg-zinc-100 dark:bg-black/40 dark:border dark:border-white/10 dark:shadow-glass-inset p-1">
                 {subTabs.map((tab) => {
                   const isActive = activeTab === tab.id;
                   return (
@@ -407,7 +416,7 @@ export default function AnalysisResultsView({
                       onClick={() => setActiveTab(tab.id)}
                       className={`rounded-lg px-3 py-1 text-xs font-semibold transition-all flex items-center space-x-1.5 ${
                         isActive
-                          ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-sm'
+                          ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 dark:shadow-glow-indigo shadow-sm'
                           : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
                       }`}
                     >
@@ -415,7 +424,7 @@ export default function AnalysisResultsView({
                       <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
                         isActive
                           ? 'bg-zinc-800 text-zinc-200 dark:bg-zinc-200 dark:text-zinc-800'
-                          : 'bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300'
+                          : 'bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
                       }`}>
                         {tab.count}
                       </span>
@@ -434,11 +443,11 @@ export default function AnalysisResultsView({
                   {informationGaps.map((gap, idx) => (
                     <div
                       key={gap.id || idx}
-                      className="rounded-xl border border-zinc-200/70 bg-zinc-50/60 p-4 transition-all hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-850/50 dark:hover:border-zinc-700"
+                      className="rounded-xl border border-zinc-200/70 bg-zinc-50/60 p-4 transition-all hover:border-zinc-300 dark:border-white/10 dark:bg-black/30 dark:shadow-glass-inset dark:hover:border-white/20"
                     >
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200/50 dark:border-zinc-800/80 pb-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200/50 dark:border-white/5 pb-2.5">
                         <div className="flex items-center space-x-2">
-                          <span className="flex h-5 w-5 items-center justify-center rounded-md bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 text-xs font-bold">
+                          <span className="flex h-5 w-5 items-center justify-center rounded-md bg-zinc-200 text-zinc-800 dark:bg-amber-500/10 dark:border dark:border-amber-500/20 dark:text-amber-400 dark:shadow-glow-amber text-xs font-bold">
                             !
                           </span>
                           <h4 className="text-xs font-bold text-zinc-900 dark:text-white">
@@ -457,18 +466,48 @@ export default function AnalysisResultsView({
                         </p>
                       </div>
 
-                      <div className="mt-3 flex items-center justify-between pt-2 border-t border-zinc-200/40 dark:border-zinc-800/50">
-                        <span className="text-[10px] text-zinc-400">
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-200/40 dark:border-white/5">
+                        <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
                           Signal: {gap.signalLabel || 'Potential Gap'}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => handleInspectGapAbsence(gap)}
-                          className="inline-flex items-center space-x-1 text-xs font-semibold text-zinc-900 hover:text-zinc-700 dark:text-white dark:hover:text-zinc-300"
-                        >
-                          <span>Verify Absence Across Sources</span>
-                          <ChevronRight className="h-3 w-3" />
-                        </button>
+                        <div className="flex items-center space-x-2">
+                          {sources.length < 6 && typeof onResolveGapWeb === 'function' && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setResolvingGapId(gap.id);
+                                try {
+                                  await onResolveGapWeb(gap);
+                                } finally {
+                                  setResolvingGapId(null);
+                                }
+                              }}
+                              disabled={resolvingGapId === gap.id || isResolvingGap}
+                              className="inline-flex items-center space-x-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20 dark:shadow-glass-inset transition-all disabled:opacity-50 cursor-pointer"
+                              title="Search relative websites to answer this information gap"
+                            >
+                              {resolvingGapId === gap.id || isResolvingGap ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 animate-spin text-indigo-600 dark:text-indigo-400" />
+                                  <span>Searching Web...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Globe className="h-3 w-3 text-indigo-600 dark:text-indigo-400" />
+                                  <span>Search Relative Websites for This Gap</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleInspectGapAbsence(gap)}
+                            className="inline-flex items-center space-x-1 text-xs font-semibold text-zinc-900 hover:text-zinc-700 dark:text-white dark:hover:text-zinc-300"
+                          >
+                            <span>Verify Absence Across Sources</span>
+                            <ChevronRight className="h-3 w-3" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -487,11 +526,13 @@ export default function AnalysisResultsView({
                   {contradictions.map((conf, idx) => (
                     <div
                       key={conf.id || idx}
-                      className="rounded-xl border border-zinc-200/70 bg-zinc-50/60 p-4 transition-all hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-850/50 dark:hover:border-zinc-700"
+                      className="rounded-xl border border-zinc-200/70 bg-zinc-50/60 p-4 transition-all hover:border-zinc-300 dark:border-white/10 dark:bg-black/30 dark:shadow-glass-inset dark:hover:border-white/20"
                     >
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200/50 dark:border-zinc-800/80 pb-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200/50 dark:border-white/5 pb-2.5">
                         <div className="flex items-center space-x-2">
-                          <GitCompare className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
+                          <span className="flex h-5 w-5 items-center justify-center rounded-md bg-zinc-200 text-zinc-800 dark:bg-rose-500/10 dark:border dark:border-rose-500/20 dark:text-rose-400 dark:shadow-glow-rose text-xs font-bold">
+                            <GitCompare className="h-3 w-3" />
+                          </span>
                           <h4 className="text-xs font-bold text-zinc-900 dark:text-white">
                             {conf.parameter}
                           </h4>
@@ -500,7 +541,7 @@ export default function AnalysisResultsView({
                       </div>
 
                       <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="rounded-lg bg-white dark:bg-zinc-900 p-2.5 border border-zinc-200/60 dark:border-zinc-800">
+                        <div className="rounded-lg bg-white dark:bg-zinc-900/80 dark:border-white/10 dark:shadow-glass-inset p-2.5 border border-zinc-200/60">
                           <span className="text-[10px] font-semibold text-zinc-400 block truncate">
                             Source A: {conf.sourceA?.title || 'First Source'}
                           </span>
@@ -508,7 +549,7 @@ export default function AnalysisResultsView({
                             "{conf.sourceA?.claim}"
                           </p>
                         </div>
-                        <div className="rounded-lg bg-white dark:bg-zinc-900 p-2.5 border border-zinc-200/60 dark:border-zinc-800">
+                        <div className="rounded-lg bg-white dark:bg-zinc-900/80 dark:border-white/10 dark:shadow-glass-inset p-2.5 border border-zinc-200/60">
                           <span className="text-[10px] font-semibold text-zinc-400 block truncate">
                             Source B: {conf.sourceB?.title || 'Second Source'}
                           </span>
@@ -527,21 +568,21 @@ export default function AnalysisResultsView({
 
                       {/* Authoritative Precedence Badge: Hierarchy of Authority (LHoA) Arbiter */}
                       {conf.precedenceVerdict && (
-                        <div className="mt-3 rounded-xl border border-zinc-200/90 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900/90 shadow-2xs">
-                          <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-zinc-100 dark:border-zinc-800/60 pb-2">
+                        <div className="mt-3 rounded-xl border border-zinc-200/90 bg-white p-3 dark:border-white/10 dark:bg-zinc-900/60 dark:backdrop-blur-md dark:shadow-glass-inset shadow-2xs">
+                          <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-zinc-100 dark:border-white/5 pb-2">
                             <div className="flex items-center space-x-1.5">
-                              <Scale className="h-3.5 w-3.5 text-zinc-900 dark:text-zinc-100" />
+                              <Scale className="h-3.5 w-3.5 text-zinc-900 dark:text-indigo-400" />
                               <span className="text-[11px] font-bold text-zinc-900 dark:text-white">
                                 Hierarchy of Authority (LHoA) Arbiter
                               </span>
-                              <span className="rounded-md bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-mono font-medium text-zinc-700 dark:text-zinc-300">
+                              <span className="rounded-md bg-zinc-100 dark:bg-zinc-800/80 dark:border dark:border-white/10 px-2 py-0.5 text-[10px] font-mono font-medium text-zinc-700 dark:text-zinc-300">
                                 Precedence:{' '}
                                 {conf.precedenceVerdict.bindingSourceId === conf.sourceA?.sourceId
                                   ? conf.sourceA?.title || 'Source A'
                                   : conf.sourceB?.title || 'Source B'}
                               </span>
                             </div>
-                            <span className="inline-flex items-center rounded-full bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 px-2.5 py-0.5 text-[10px] font-bold">
+                            <span className="inline-flex items-center rounded-full bg-zinc-900 text-white dark:bg-indigo-500/20 dark:border dark:border-indigo-500/30 dark:text-indigo-300 dark:shadow-glow-indigo px-2.5 py-0.5 text-[10px] font-bold">
                               {conf.precedenceVerdict.confidence || 'Definitive Precedence'}
                             </span>
                           </div>
@@ -554,7 +595,7 @@ export default function AnalysisResultsView({
                         </div>
                       )}
 
-                      <div className="mt-3 flex items-center justify-end space-x-3 pt-2 border-t border-zinc-200/40 dark:border-zinc-800/50">
+                      <div className="mt-3 flex items-center justify-end space-x-3 pt-2 border-t border-zinc-200/40 dark:border-white/5">
                         <button
                           type="button"
                           onClick={() => handleInspectConflictDiff(conf)}
@@ -581,11 +622,13 @@ export default function AnalysisResultsView({
                   {outdatedWarnings.map((warn, idx) => (
                     <div
                       key={warn.id || idx}
-                      className="rounded-xl border border-zinc-200/70 bg-zinc-50/60 p-4 transition-all hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-850/50 dark:hover:border-zinc-700"
+                      className="rounded-xl border border-zinc-200/70 bg-zinc-50/60 p-4 transition-all hover:border-zinc-300 dark:border-white/10 dark:bg-black/30 dark:shadow-glass-inset dark:hover:border-white/20"
                     >
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200/50 dark:border-zinc-800/80 pb-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200/50 dark:border-white/5 pb-2.5">
                         <div className="flex items-center space-x-2">
-                          <Clock className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
+                          <span className="flex h-5 w-5 items-center justify-center rounded-md bg-zinc-200 text-zinc-800 dark:bg-amber-500/10 dark:border dark:border-amber-500/20 dark:text-amber-400 dark:shadow-glow-amber text-xs font-bold">
+                            <Clock className="h-3 w-3" />
+                          </span>
                           <h4 className="text-xs font-bold text-zinc-900 dark:text-white truncate max-w-sm">
                             {warn.sourceTitle}
                           </h4>
@@ -597,8 +640,8 @@ export default function AnalysisResultsView({
                         {warn.riskDescription}
                       </p>
 
-                      <div className="mt-3 flex items-center justify-between pt-2 border-t border-zinc-200/40 dark:border-zinc-800/50">
-                        <span className="text-[10px] text-zinc-400">
+                      <div className="mt-3 flex items-center justify-between pt-2 border-t border-zinc-200/40 dark:border-white/5">
+                        <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
                           Detected Date: {warn.detectedDate || 'Undated'}
                         </span>
                         <button
@@ -627,11 +670,13 @@ export default function AnalysisResultsView({
                   {sourcedFacts.map((fact, idx) => (
                     <div
                       key={fact.id || idx}
-                      className="rounded-xl border border-zinc-200/70 bg-zinc-50/60 p-4 transition-all hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-850/50 dark:hover:border-zinc-700"
+                      className="rounded-xl border border-zinc-200/70 bg-zinc-50/60 p-4 transition-all hover:border-zinc-300 dark:border-white/10 dark:bg-black/30 dark:shadow-glass-inset dark:hover:border-white/20"
                     >
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200/50 dark:border-zinc-800/80 pb-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200/50 dark:border-white/5 pb-2.5">
                         <div className="flex items-center space-x-2">
-                          <FileText className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
+                          <span className="flex h-5 w-5 items-center justify-center rounded-md bg-zinc-200 text-zinc-800 dark:bg-emerald-500/10 dark:border dark:border-emerald-500/20 dark:text-emerald-400 dark:shadow-glow-emerald text-xs font-bold">
+                            <FileText className="h-3 w-3" />
+                          </span>
                           <h4 className="text-xs font-bold text-zinc-900 dark:text-white">
                             {fact.category || 'Corroborated Fact'}
                           </h4>
@@ -644,13 +689,13 @@ export default function AnalysisResultsView({
                       </p>
 
                       {fact.evidenceQuote && (
-                        <div className="mt-2 rounded-lg bg-white dark:bg-zinc-900 p-2.5 border border-zinc-200/60 dark:border-zinc-800 text-[11px] text-zinc-500 italic">
+                        <div className="mt-2 rounded-lg bg-white dark:bg-zinc-900/80 dark:border-white/10 dark:shadow-glass-inset p-2.5 border border-zinc-200/60 text-[11px] text-zinc-500 dark:text-zinc-400 italic">
                           "{fact.evidenceQuote}"
                         </div>
                       )}
 
-                      <div className="mt-3 flex items-center justify-between pt-2 border-t border-zinc-200/40 dark:border-zinc-800/50">
-                        <span className="text-[10px] text-zinc-400">
+                      <div className="mt-3 flex items-center justify-between pt-2 border-t border-zinc-200/40 dark:border-white/5">
+                        <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
                           Sources: {(fact.sourceTitles || []).join(', ') || 'Document'}
                         </span>
                         <button
@@ -676,10 +721,10 @@ export default function AnalysisResultsView({
             </div>
 
             {/* 3 Mini Sub-Cards with Segmented Vertical Tick Progress Bars */}
-            <div className="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="mt-6 pt-5 border-t border-zinc-100 dark:border-white/5 grid grid-cols-1 sm:grid-cols-3 gap-3">
               
               {/* Mini Card 1: Fact Corroboration */}
-              <div className="rounded-xl border border-zinc-200/70 bg-zinc-50/50 p-3.5 dark:border-zinc-800 dark:bg-zinc-850/40">
+              <div className="rounded-xl border border-zinc-200/70 bg-zinc-50/50 p-3.5 dark:border-white/10 dark:bg-black/20 dark:shadow-glass-inset">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
                     Fact Corroboration
@@ -697,7 +742,7 @@ export default function AnalysisResultsView({
               </div>
 
               {/* Mini Card 2: Rubric Completeness */}
-              <div className="rounded-xl border border-zinc-200/70 bg-zinc-50/50 p-3.5 dark:border-zinc-800 dark:bg-zinc-850/40">
+              <div className="rounded-xl border border-zinc-200/70 bg-zinc-50/50 p-3.5 dark:border-white/10 dark:bg-black/20 dark:shadow-glass-inset">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
                     Rubric Completeness
@@ -715,7 +760,7 @@ export default function AnalysisResultsView({
               </div>
 
               {/* Mini Card 3: Temporal Currency */}
-              <div className="rounded-xl border border-zinc-200/70 bg-zinc-50/50 p-3.5 dark:border-zinc-800 dark:bg-zinc-850/40">
+              <div className="rounded-xl border border-zinc-200/70 bg-zinc-50/50 p-3.5 dark:border-white/10 dark:bg-black/20 dark:shadow-glass-inset">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
                     Temporal Currency
@@ -741,7 +786,7 @@ export default function AnalysisResultsView({
         {/* RIGHT SIDE CARD (4 COLS): DECISION READINESS & RUBRIC PROGRESS */}
         {/* ================================================================= */}
         <div className="lg:col-span-4 space-y-6">
-          <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-soft dark:border-zinc-800 dark:bg-zinc-900 space-y-5">
+          <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-soft dark:border-white/10 dark:bg-zinc-900/40 dark:backdrop-blur-xl dark:shadow-glass-inset space-y-5">
             
             {/* Header */}
             <div>
@@ -756,8 +801,8 @@ export default function AnalysisResultsView({
             {/* 3-Column Mini Badge Grid for Epistemic Tiers */}
             <div className="grid grid-cols-3 gap-2 py-1">
               
-              <div className="flex flex-col items-center justify-center rounded-xl border border-zinc-200/70 bg-zinc-50/60 p-3 dark:border-zinc-800 dark:bg-zinc-850/50 text-center">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100">
+              <div className="flex flex-col items-center justify-center rounded-xl border border-zinc-200/70 bg-zinc-50/60 p-3 dark:border-white/10 dark:bg-black/30 dark:shadow-glass-inset text-center">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 text-zinc-900 dark:bg-emerald-500/10 dark:border dark:border-emerald-500/20 dark:text-emerald-400 dark:shadow-glow-emerald">
                   <Check className="h-4 w-4" />
                 </div>
                 <span className="mt-2 text-base font-bold text-zinc-900 dark:text-white">
@@ -768,8 +813,8 @@ export default function AnalysisResultsView({
                 </span>
               </div>
 
-              <div className="flex flex-col items-center justify-center rounded-xl border border-zinc-200/70 bg-zinc-50/60 p-3 dark:border-zinc-800 dark:bg-zinc-850/50 text-center">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100">
+              <div className="flex flex-col items-center justify-center rounded-xl border border-zinc-200/70 bg-zinc-50/60 p-3 dark:border-white/10 dark:bg-black/30 dark:shadow-glass-inset text-center">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 text-zinc-900 dark:bg-amber-500/10 dark:border dark:border-amber-500/20 dark:text-amber-400 dark:shadow-glow-amber">
                   <AlertTriangle className="h-4 w-4" />
                 </div>
                 <span className="mt-2 text-base font-bold text-zinc-900 dark:text-white">
@@ -780,8 +825,8 @@ export default function AnalysisResultsView({
                 </span>
               </div>
 
-              <div className="flex flex-col items-center justify-center rounded-xl border border-zinc-200/70 bg-zinc-50/60 p-3 dark:border-zinc-800 dark:bg-zinc-850/50 text-center">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100">
+              <div className="flex flex-col items-center justify-center rounded-xl border border-zinc-200/70 bg-zinc-50/60 p-3 dark:border-white/10 dark:bg-black/30 dark:shadow-glass-inset text-center">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 text-zinc-900 dark:bg-rose-500/10 dark:border dark:border-rose-500/20 dark:text-rose-400 dark:shadow-glow-rose">
                   <GitCompare className="h-4 w-4" />
                 </div>
                 <span className="mt-2 text-base font-bold text-zinc-900 dark:text-white">
@@ -795,7 +840,7 @@ export default function AnalysisResultsView({
             </div>
 
             {/* Sleek Horizontal Charcoal Progress Bar */}
-            <div className="space-y-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="space-y-2 pt-2 border-t border-zinc-100 dark:border-white/5">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-zinc-700 dark:text-zinc-300">
                   Readiness Score
@@ -805,7 +850,7 @@ export default function AnalysisResultsView({
                 </span>
               </div>
 
-              <div className="h-2.5 w-full rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+              <div className="h-2.5 w-full rounded-full bg-zinc-100 dark:bg-black/40 dark:border dark:border-white/10 overflow-hidden">
                 <div
                   className="h-full rounded-full bg-zinc-900 dark:bg-zinc-100 transition-all duration-500"
                   style={{ width: `${Math.min(100, Math.max(5, readinessScore))}%` }}
@@ -818,7 +863,7 @@ export default function AnalysisResultsView({
             </div>
 
             {/* Rubric Breakdown List */}
-            <div className="space-y-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="space-y-2 pt-2 border-t border-zinc-100 dark:border-white/5">
               <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 block">
                 Required Rubric Status
               </span>
@@ -828,7 +873,7 @@ export default function AnalysisResultsView({
                   return (
                     <div
                       key={i}
-                      className="flex items-center justify-between text-[11px] p-2 rounded-lg bg-zinc-50 dark:bg-zinc-850 border border-zinc-200/50 dark:border-zinc-800"
+                      className="flex items-center justify-between text-[11px] p-2 rounded-lg bg-zinc-50 dark:bg-black/30 dark:border-white/10 dark:shadow-glass-inset border border-zinc-200/50"
                     >
                       <span className="truncate max-w-[180px] text-zinc-700 dark:text-zinc-300">
                         {param}
@@ -845,7 +890,7 @@ export default function AnalysisResultsView({
               <button
                 type="button"
                 onClick={onProceedToChecklist}
-                className="w-full rounded-xl bg-zinc-900 py-3 text-xs font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 shadow-soft transition-all flex items-center justify-center space-x-2"
+                className="w-full rounded-xl bg-zinc-900 py-3 text-xs font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white dark:hover:shadow-glow-indigo shadow-soft transition-all flex items-center justify-center space-x-2"
               >
                 <span>Proceed to Verification Checklist</span>
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -858,11 +903,11 @@ export default function AnalysisResultsView({
       </div>
 
       {/* 3. BOTTOM ACTIONS BAR */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-zinc-200/80 dark:border-zinc-800">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-zinc-200/80 dark:border-white/10">
         <button
           type="button"
           onClick={onBackToSources}
-          className="inline-flex items-center space-x-1.5 rounded-xl border border-zinc-200/80 bg-white px-4 py-2.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors w-full sm:w-auto justify-center"
+          className="inline-flex items-center space-x-1.5 rounded-xl border border-zinc-200/80 bg-white px-4 py-2.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-800/50 dark:hover:bg-zinc-700/80 dark:text-zinc-300 dark:hover:text-white dark:shadow-glass-inset transition-colors w-full sm:w-auto justify-center"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           <span>← Back to Source Workspace</span>
@@ -871,7 +916,7 @@ export default function AnalysisResultsView({
         <button
           type="button"
           onClick={onProceedToChecklist}
-          className="inline-flex items-center space-x-2 rounded-xl bg-zinc-900 px-5 py-2.5 text-xs font-semibold text-white shadow-soft hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 transition-all w-full sm:w-auto justify-center"
+          className="inline-flex items-center space-x-2 rounded-xl bg-zinc-900 px-5 py-2.5 text-xs font-semibold text-white shadow-soft hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white dark:hover:shadow-glow-indigo transition-all w-full sm:w-auto justify-center"
         >
           <span>Next: Verification Checklist</span>
           <ArrowRight className="h-3.5 w-3.5" />

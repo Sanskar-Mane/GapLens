@@ -11,6 +11,7 @@ const {
   extractUrlContent,
   detectTemporalMetadata,
   searchPermittedSources,
+  autoDiscoverAndScrapeSources,
 } = require('../services/scraperService');
 const { extractFromUrl } = require('../services/extractor');
 const { analyzeSourcesWithAI } = require('../services/aiAnalysisService');
@@ -144,6 +145,43 @@ router.post('/search-sources', async (req, res) => {
   }
   const result = await searchPermittedSources(query);
   return res.json(result);
+});
+
+/**
+ * POST /api/auto-discover
+ * Autonomous Relative Website Discovery & Live Scraping
+ */
+router.post('/auto-discover', async (req, res) => {
+  try {
+    const { topic, category, existingSources, maxNewSources } = req.body;
+
+    if (!topic || typeof topic !== 'string' || !topic.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a clear research question or topic to auto-discover relative websites.',
+      });
+    }
+
+    const result = await autoDiscoverAndScrapeSources({
+      topic: topic.trim(),
+      category: category || 'General',
+      existingSources: Array.isArray(existingSources) ? existingSources : [],
+      maxNewSources: typeof maxNewSources === 'number' ? maxNewSources : 3,
+    });
+
+    return res.json({
+      success: true,
+      discoveredSources: result.discoveredSources,
+      count: result.discoveredSources.length,
+      searchQueriesUsed: result.searchQueriesUsed,
+    });
+  } catch (err) {
+    console.error('[Auto-Discover Error]', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to auto-discover sources: ' + err.message,
+    });
+  }
 });
 
 /**
@@ -757,13 +795,22 @@ router.delete('/sessions/:id', async (req, res) => {
 
 /**
  * POST /api/analyze
- * Phase 3 Deep AI Gap-Detection Engine with Multi-Model Fallback
- * Analyzes provided sources for information gaps, cross-source contradictions,
+ * Phase 3 Deep AI Gap-Detection Engine with Autonomous Web Discovery & Multi-Model Fallback
+ * Analyzes user-provided & auto-discovered web sources for information gaps, cross-source contradictions,
  * outdated warnings, and generates a prioritized verification checklist.
  */
 router.post('/analyze', async (req, res) => {
   try {
-    const { topic, category, sources, openRouterKey, geminiKey, model, forceDemoMode } = req.body;
+    const {
+      topic,
+      category,
+      sources = [],
+      autoDiscoverWeb = true,
+      openRouterKey,
+      geminiKey,
+      model,
+      forceDemoMode,
+    } = req.body;
 
     if (!topic || typeof topic !== 'string' || !topic.trim()) {
       return res.status(400).json({
@@ -772,22 +819,55 @@ router.post('/analyze', async (req, res) => {
       });
     }
 
-    if (!Array.isArray(sources) || sources.length < 2) {
-      return res.status(400).json({
-        success: false,
-        message: 'Minimum 2 sources are required for cross-source gap detection.',
-      });
-    }
-
-    const validSources = sources.filter(
+    const rawSources = Array.isArray(sources) ? sources : [];
+    const validSources = rawSources.filter(
       (s) => s && s.content && typeof s.content === 'string' && s.content.trim().length >= 10
     );
 
-    if (validSources.length < 2) {
+    let combinedSources = [...validSources];
+
+    // Autonomous Discovery Trigger: If autoDiscoverWeb === true OR validSources.length < 2
+    const isAutoDiscoverEnabled = autoDiscoverWeb !== false;
+    if (isAutoDiscoverEnabled || validSources.length < 2) {
+      let neededSources = 0;
+      if (validSources.length === 0) {
+        neededSources = 4;
+      } else if (validSources.length === 1) {
+        neededSources = 3;
+      } else if (validSources.length >= 2 && isAutoDiscoverEnabled) {
+        neededSources = Math.min(2, Math.max(0, 6 - validSources.length));
+      }
+
+      if (neededSources > 0) {
+        try {
+          const autoDiscResult = await autoDiscoverAndScrapeSources({
+            topic: topic.trim(),
+            category: category || 'Education',
+            existingSources: validSources,
+            maxNewSources: neededSources,
+          });
+
+          if (Array.isArray(autoDiscResult.discoveredSources) && autoDiscResult.discoveredSources.length > 0) {
+            combinedSources = [...validSources, ...autoDiscResult.discoveredSources];
+          }
+        } catch (discErr) {
+          console.warn('[Autonomous Discovery Warning]', discErr.message);
+        }
+      }
+    }
+
+    // Re-index combined source IDs cleanly as src-1, src-2, ...
+    combinedSources = combinedSources.map((s, idx) => ({
+      ...s,
+      id: `src-${idx + 1}`,
+    }));
+
+    if (combinedSources.length < 2) {
       return res.status(400).json({
         success: false,
-        message: `At least 2 sources must contain meaningful text (found ${validSources.length} valid source${validSources.length === 1 ? '' : 's'
-          }). Please fill in or paste content for your sources.`,
+        message: `At least 2 sources are required for cross-source gap detection (found ${combinedSources.length} valid source${
+          combinedSources.length === 1 ? '' : 's'
+        }). Please add sources or enable web discovery.`,
       });
     }
 
@@ -822,7 +902,7 @@ router.post('/analyze', async (req, res) => {
     const aiResult = await analyzeSourcesWithAI({
       topic: topic.trim(),
       category: category || 'Education',
-      sources: validSources,
+      sources: combinedSources,
       openRouterKey: activeKey,
       geminiKey: activeKey,
       preferredModel: activeModel,
@@ -843,7 +923,7 @@ router.post('/analyze', async (req, res) => {
       const sessionPayload = {
         topic: topic.trim(),
         category: category || 'Education',
-        sources: validSources,
+        sources: combinedSources,
         model_used: aiResult.meta.modelUsed,
         analysis_result: aiResult.analysis,
         created_at: new Date().toISOString(),
@@ -877,13 +957,18 @@ router.post('/analyze', async (req, res) => {
       console.warn('[Session Auto-Save Error]', saveErr.message);
     }
 
+    const autoDiscoveredCount = combinedSources.filter((s) => s.isAutoDiscovered).length;
+
     return res.json({
       success: true,
       analysis: aiResult.analysis,
+      sources: combinedSources,
+      autoDiscoveredCount,
       meta: {
         ...aiResult.meta,
         sessionId: savedSessionId,
         storage: savedStorage,
+        autoDiscoveredCount,
       },
     });
   } catch (err) {

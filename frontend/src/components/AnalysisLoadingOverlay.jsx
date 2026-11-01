@@ -11,7 +11,7 @@ import {
 const ANALYSIS_STEPS = [
   {
     icon: Search,
-    label: 'Ingesting and normalizing text across sources...',
+    label: 'Searching relative websites & scraping live regulatory text...',
   },
   {
     icon: Calendar,
@@ -51,10 +51,10 @@ export default function AnalysisLoadingOverlay({ activeModel, isVisible = true }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-full max-w-md rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-2xl transition-colors dark:border-zinc-800 dark:bg-zinc-900 text-center space-y-5">
+      <div className="relative w-full max-w-md rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-2xl transition-all dark:border-white/10 dark:bg-zinc-900/90 dark:backdrop-blur-2xl dark:shadow-glass-inset text-center space-y-5">
         
         {/* Minimal Icon */}
-        <div className="relative mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-soft">
+        <div className="relative mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-soft dark:shadow-glow-indigo">
           <Sparkles className="h-6 w-6 animate-spin" style={{ animationDuration: '6s' }} />
           <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-zinc-700 text-[9px] text-white">
             <Loader2 className="h-2.5 w-2.5 animate-spin" />
@@ -86,19 +86,19 @@ export default function AnalysisLoadingOverlay({ activeModel, isVisible = true }
                 key={idx}
                 className={`flex items-center space-x-2.5 rounded-xl p-2.5 text-xs transition-all ${
                   isCurrent
-                    ? 'border border-zinc-900/40 bg-zinc-100 font-semibold text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white'
+                    ? 'border border-zinc-900/40 bg-zinc-100 font-semibold text-zinc-900 dark:border-white/10 dark:bg-black/40 dark:shadow-glass-inset dark:text-white'
                     : isDone
                     ? 'text-zinc-400 opacity-60'
-                    : 'text-zinc-300 dark:text-zinc-700'
+                    : 'text-zinc-300 dark:text-zinc-600'
                 }`}
               >
                 <div
                   className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${
                     isCurrent
-                      ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                      ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:shadow-glow-indigo'
                       : isDone
-                      ? 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
-                      : 'bg-zinc-100 text-zinc-400 dark:bg-zinc-850 dark:text-zinc-600'
+                      ? 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800/80 dark:border dark:border-white/10 dark:text-zinc-300'
+                      : 'bg-zinc-100 text-zinc-400 dark:bg-zinc-900 dark:text-zinc-700'
                   }`}
                 >
                   <Icon className="h-3 w-3" />

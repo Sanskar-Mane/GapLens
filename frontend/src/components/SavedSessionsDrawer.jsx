@@ -96,12 +96,12 @@ export default function SavedSessionsDrawer({
       />
 
       <div className="fixed inset-y-0 right-0 flex max-w-full pl-10">
-        <div className="w-screen max-w-md transform border-l border-zinc-200/80 bg-white shadow-2xl transition-all dark:border-zinc-800 dark:bg-zinc-900 flex flex-col">
+        <div className="w-screen max-w-md transform border-l border-zinc-200/80 bg-white shadow-2xl transition-all dark:border-white/10 dark:bg-zinc-900/95 dark:backdrop-blur-2xl dark:shadow-glass-inset flex flex-col">
           
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4 dark:border-zinc-800">
+          <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4 dark:border-white/5">
             <div className="flex items-center space-x-2.5">
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:shadow-glow-indigo">
                 <History className="h-4 w-4" />
               </span>
               <div>
@@ -120,7 +120,7 @@ export default function SavedSessionsDrawer({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+              className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 transition-colors"
             >
               <X className="h-4 w-4" />
             </button>
@@ -130,7 +130,7 @@ export default function SavedSessionsDrawer({
           <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
             {!user ? (
               <div className="py-16 text-center space-y-4 px-4">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-700 dark:bg-black/30 dark:border dark:border-white/10 dark:text-zinc-300 dark:shadow-glass-inset">
                   <User className="h-7 w-7" />
                 </div>
                 <div className="space-y-1.5 max-w-xs mx-auto">
@@ -148,7 +148,7 @@ export default function SavedSessionsDrawer({
                       onClose();
                       if (onOpenAuthModal) onOpenAuthModal();
                     }}
-                    className="inline-flex items-center space-x-2 rounded-xl bg-zinc-900 px-5 py-2.5 text-xs font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 transition-colors shadow-soft"
+                    className="inline-flex items-center space-x-2 rounded-xl bg-zinc-900 px-5 py-2.5 text-xs font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white dark:hover:shadow-glow-indigo transition-all shadow-soft"
                   >
                     <LogIn className="h-4 w-4" />
                     <span>Sign In</span>
@@ -194,10 +194,10 @@ export default function SavedSessionsDrawer({
                           onLoadSession(session);
                           onClose();
                         }}
-                        className="group cursor-pointer rounded-2xl border border-zinc-200/80 bg-zinc-50/60 p-4 transition-all hover:border-zinc-300 hover:bg-white dark:border-zinc-800 dark:bg-zinc-850/50 dark:hover:border-zinc-700 dark:hover:bg-zinc-850 space-y-2 shadow-soft"
+                        className="group cursor-pointer rounded-2xl border border-zinc-200/80 bg-zinc-50/60 p-4 transition-all hover:border-zinc-300 hover:bg-white dark:border-white/10 dark:bg-black/30 dark:hover:border-white/20 dark:hover:bg-zinc-800/40 space-y-2 shadow-soft dark:shadow-glass-inset"
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <span className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 dark:text-zinc-400">
+                          <span className="rounded-full bg-zinc-100 dark:bg-zinc-800/80 dark:border dark:border-white/10 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 dark:text-zinc-400">
                             {session.category || 'General'}
                           </span>
                           {score !== undefined && (
@@ -211,13 +211,13 @@ export default function SavedSessionsDrawer({
                           {session.topic}
                         </h4>
 
-                        <div className="flex items-center justify-between text-[10px] text-zinc-400 pt-1 border-t border-zinc-200/50 dark:border-zinc-800">
+                        <div className="flex items-center justify-between text-[10px] text-zinc-400 pt-1 border-t border-zinc-200/50 dark:border-white/5">
                           <span>{dateFormatted} &bull; {sourceCount} sources</span>
                           <div className="flex items-center space-x-2">
                             <button
                               type="button"
                               onClick={(e) => handleDelete(e, session.id)}
-                              className="p-1 text-zinc-400 hover:text-rose-600"
+                              className="p-1 text-zinc-400 hover:text-rose-600 transition-colors"
                               title="Delete session"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -236,11 +236,11 @@ export default function SavedSessionsDrawer({
           </div>
 
           {/* Footer */}
-          <div className="border-t border-zinc-100 bg-zinc-50 px-6 py-3.5 dark:border-zinc-800 dark:bg-zinc-950 flex justify-end">
+          <div className="border-t border-zinc-100 bg-zinc-50 px-6 py-3.5 dark:border-white/5 dark:bg-zinc-950/80 flex justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 shadow-soft"
+              className="rounded-xl bg-zinc-900 px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white dark:hover:shadow-glow-indigo shadow-soft transition-all"
             >
               Close
             </button>

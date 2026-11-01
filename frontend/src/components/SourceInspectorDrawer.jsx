@@ -134,12 +134,12 @@ export default function SourceInspectorDrawer({
         <div
           className={`w-screen ${
             isDiff ? 'max-w-4xl' : 'max-w-2xl'
-          } transform border-l border-zinc-200/80 bg-white shadow-2xl transition-all dark:border-zinc-800 dark:bg-zinc-900 flex flex-col`}
+          } transform border-l border-zinc-200/80 bg-white shadow-2xl transition-all dark:border-white/10 dark:bg-zinc-900/95 dark:backdrop-blur-2xl dark:shadow-glass-inset flex flex-col`}
         >
           {/* Top Header */}
-          <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4 dark:border-zinc-800">
+          <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4 dark:border-white/5">
             <div className="flex items-center space-x-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:shadow-glow-indigo">
                 {isDiff ? (
                   <GitCompare className="h-4 w-4" />
                 ) : isAll ? (
@@ -156,7 +156,7 @@ export default function SourceInspectorDrawer({
                     ? 'Cross-Source Absence Verification'
                     : 'Source Evidence Inspector'}
                 </h3>
-                <p className="text-[11px] text-zinc-400">
+                <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
                   {isDiff
                     ? 'Compare conflicting claims in original context'
                     : isAll
@@ -181,13 +181,13 @@ export default function SourceInspectorDrawer({
             {/* VIEW MODE 1: DIFF */}
             {isDiff && (
               <div className="space-y-5">
-                <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-850">
+                <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50 p-4 dark:border-white/10 dark:bg-black/30 dark:shadow-glass-inset">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-900 dark:text-white flex items-center space-x-1.5">
                       <GitCompare className="h-3.5 w-3.5" />
                       <span>Disputed Parameter</span>
                     </span>
-                    <span className="rounded-full bg-zinc-200 dark:bg-zinc-700 px-2.5 py-0.5 text-[10px] font-bold uppercase text-zinc-800 dark:text-zinc-200">
+                    <span className="rounded-full bg-zinc-200 dark:bg-zinc-800/80 dark:border dark:border-white/10 px-2.5 py-0.5 text-[10px] font-bold uppercase text-zinc-800 dark:text-zinc-200">
                       {severity || 'Conflict'}
                     </span>
                   </div>
@@ -195,7 +195,7 @@ export default function SourceInspectorDrawer({
                     {disputedParameter || 'Contradictory Threshold'}
                   </h4>
                   {resolutionAdvice && (
-                    <div className="mt-3 rounded-xl border border-zinc-200 bg-white p-3 text-xs text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+                    <div className="mt-3 rounded-xl border border-zinc-200 bg-white p-3 text-xs text-zinc-700 dark:border-white/10 dark:bg-zinc-900/80 dark:text-zinc-300 dark:shadow-glass-inset">
                       <strong className="font-semibold text-zinc-900 dark:text-white">
                         Resolution Advice:{' '}
                       </strong>
@@ -207,8 +207,8 @@ export default function SourceInspectorDrawer({
                 {/* 2-Column Split */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Source A */}
-                  <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50/60 p-4 dark:border-zinc-800 dark:bg-zinc-850/50 flex flex-col">
-                    <div className="flex items-center justify-between border-b border-zinc-200/60 dark:border-zinc-800 pb-2.5 mb-3">
+                  <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50/60 p-4 dark:border-white/10 dark:bg-black/30 dark:shadow-glass-inset flex flex-col">
+                    <div className="flex items-center justify-between border-b border-zinc-200/60 dark:border-white/5 pb-2.5 mb-3">
                       <span className="text-xs font-bold text-zinc-900 dark:text-white truncate">
                         {sourceA?.title || 'Source A'}
                       </span>
@@ -218,7 +218,7 @@ export default function SourceInspectorDrawer({
                     </div>
 
                     {evidenceQuoteA && (
-                      <div className="mb-3 rounded-xl border border-zinc-200 bg-white p-2.5 text-xs text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+                      <div className="mb-3 rounded-xl border border-zinc-200 bg-white p-2.5 text-xs text-zinc-800 dark:border-white/10 dark:bg-zinc-900/80 dark:text-zinc-200 dark:shadow-glass-inset">
                         <span className="font-bold block text-[10px] uppercase text-zinc-500 mb-0.5">
                           Extracted Claim (Source A):
                         </span>
@@ -226,7 +226,7 @@ export default function SourceInspectorDrawer({
                       </div>
                     )}
 
-                    <div className="flex-1 rounded-xl border border-zinc-200 bg-white p-3 text-xs text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 max-h-96 overflow-y-auto leading-relaxed shadow-inner">
+                    <div className="flex-1 rounded-xl border border-zinc-200 bg-white p-3 text-xs text-zinc-700 dark:border-white/10 dark:bg-zinc-900/60 dark:text-zinc-300 max-h-96 overflow-y-auto leading-relaxed shadow-inner">
                       <HighlightedContent
                         content={sourceA?.content}
                         quote={evidenceQuoteA}
@@ -235,8 +235,8 @@ export default function SourceInspectorDrawer({
                   </div>
 
                   {/* Source B */}
-                  <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50/60 p-4 dark:border-zinc-800 dark:bg-zinc-850/50 flex flex-col">
-                    <div className="flex items-center justify-between border-b border-zinc-200/60 dark:border-zinc-800 pb-2.5 mb-3">
+                  <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50/60 p-4 dark:border-white/10 dark:bg-black/30 dark:shadow-glass-inset flex flex-col">
+                    <div className="flex items-center justify-between border-b border-zinc-200/60 dark:border-white/5 pb-2.5 mb-3">
                       <span className="text-xs font-bold text-zinc-900 dark:text-white truncate">
                         {sourceB?.title || 'Source B'}
                       </span>
@@ -246,7 +246,7 @@ export default function SourceInspectorDrawer({
                     </div>
 
                     {evidenceQuoteB && (
-                      <div className="mb-3 rounded-xl border border-zinc-200 bg-white p-2.5 text-xs text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+                      <div className="mb-3 rounded-xl border border-zinc-200 bg-white p-2.5 text-xs text-zinc-800 dark:border-white/10 dark:bg-zinc-900/80 dark:text-zinc-200 dark:shadow-glass-inset">
                         <span className="font-bold block text-[10px] uppercase text-zinc-500 mb-0.5">
                           Extracted Claim (Source B):
                         </span>
@@ -254,7 +254,7 @@ export default function SourceInspectorDrawer({
                       </div>
                     )}
 
-                    <div className="flex-1 rounded-xl border border-zinc-200 bg-white p-3 text-xs text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 max-h-96 overflow-y-auto leading-relaxed shadow-inner">
+                    <div className="flex-1 rounded-xl border border-zinc-200 bg-white p-3 text-xs text-zinc-700 dark:border-white/10 dark:bg-zinc-900/60 dark:text-zinc-300 max-h-96 overflow-y-auto leading-relaxed shadow-inner">
                       <HighlightedContent
                         content={sourceB?.content}
                         quote={evidenceQuoteB}
@@ -268,7 +268,7 @@ export default function SourceInspectorDrawer({
             {/* VIEW MODE 2: ALL SOURCES ABSENCE */}
             {isAll && (
               <div className="space-y-4">
-                <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-850">
+                <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50 p-4 dark:border-white/10 dark:bg-black/30 dark:shadow-glass-inset">
                   <div className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-zinc-900 dark:text-white mb-1">
                     <AlertTriangle className="h-4 w-4" />
                     <span>Digital Dark Spot Verification</span>
@@ -276,7 +276,7 @@ export default function SourceInspectorDrawer({
                   <h4 className="text-sm font-bold text-zinc-900 dark:text-white">
                     {gapTitle || 'Missing Requirement'}
                   </h4>
-                  <p className="mt-2 text-xs text-zinc-800 dark:text-zinc-200 bg-white dark:bg-zinc-900 p-2.5 rounded-xl border border-zinc-200/60 dark:border-zinc-800 font-medium">
+                  <p className="mt-2 text-xs text-zinc-800 dark:text-zinc-200 bg-white dark:bg-zinc-900/80 p-2.5 rounded-xl border border-zinc-200/60 dark:border-white/10 dark:shadow-glass-inset font-medium">
                     <strong className="text-zinc-900 dark:text-white">Unanswered Question: </strong>
                     {missingQuestion}
                   </p>
@@ -289,9 +289,9 @@ export default function SourceInspectorDrawer({
                   {sources.map((s, idx) => (
                     <div
                       key={s.id || idx}
-                      className="rounded-2xl border border-zinc-200/80 bg-zinc-50/60 p-4 dark:border-zinc-800 dark:bg-zinc-850/50"
+                      className="rounded-2xl border border-zinc-200/80 bg-zinc-50/60 p-4 dark:border-white/10 dark:bg-black/30 dark:shadow-glass-inset"
                     >
-                      <div className="flex items-center justify-between border-b border-zinc-200/60 dark:border-zinc-800 pb-2 mb-2">
+                      <div className="flex items-center justify-between border-b border-zinc-200/60 dark:border-white/5 pb-2 mb-2">
                         <span className="text-xs font-bold text-zinc-900 dark:text-white">
                           [{s.id || `src-${idx + 1}`}] {s.title}
                         </span>
@@ -299,7 +299,7 @@ export default function SourceInspectorDrawer({
                           {s.publishedDate || 'Undated'}
                         </span>
                       </div>
-                      <div className="text-xs text-zinc-600 dark:text-zinc-400 max-h-36 overflow-y-auto leading-relaxed bg-white dark:bg-zinc-900 p-2.5 rounded-xl border border-zinc-200/80 dark:border-zinc-800 font-mono">
+                      <div className="text-xs text-zinc-600 dark:text-zinc-400 max-h-36 overflow-y-auto leading-relaxed bg-white dark:bg-black/40 p-2.5 rounded-xl border border-zinc-200/80 dark:border-white/10 dark:shadow-inner font-mono">
                         {s.content || '(No text recorded)'}
                       </div>
                     </div>
@@ -311,14 +311,14 @@ export default function SourceInspectorDrawer({
             {/* VIEW MODE 3: SINGLE SOURCE */}
             {!isDiff && !isAll && source && (
               <div className="space-y-4">
-                <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50 p-3.5 text-xs dark:border-zinc-800 dark:bg-zinc-850">
+                <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50 p-3.5 text-xs dark:border-white/10 dark:bg-black/30 dark:shadow-glass-inset">
                   <span className="font-bold block text-[11px] uppercase tracking-wider text-zinc-900 dark:text-white mb-0.5">
                     Inspection Context
                   </span>
                   <span className="text-zinc-600 dark:text-zinc-300">{reason}</span>
                 </div>
 
-                <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50/60 p-4 dark:border-zinc-800 dark:bg-zinc-850/50 space-y-2">
+                <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50/60 p-4 dark:border-white/10 dark:bg-black/30 dark:shadow-glass-inset space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h4 className="text-sm font-bold text-zinc-900 dark:text-white">
                       [{source.id || 'src'}] {source.title || 'Referenced Document'}
@@ -338,17 +338,17 @@ export default function SourceInspectorDrawer({
                   </div>
 
                   <div className="flex flex-wrap gap-2 pt-1 text-[11px]">
-                    <span className="rounded-full bg-white dark:bg-zinc-900 px-2.5 py-0.5 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 font-medium">
+                    <span className="rounded-full bg-white dark:bg-zinc-800/80 px-2.5 py-0.5 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-white/10 font-medium">
                       Type: {source.sourceType || 'Document'}
                     </span>
-                    <span className="rounded-full bg-white dark:bg-zinc-900 px-2.5 py-0.5 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 font-mono">
+                    <span className="rounded-full bg-white dark:bg-zinc-800/80 px-2.5 py-0.5 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-white/10 font-mono">
                       Date: {source.publishedDate || 'Undated'}
                     </span>
                   </div>
                 </div>
 
                 {evidenceQuote && (
-                  <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50 p-3.5 dark:border-zinc-800 dark:bg-zinc-850">
+                  <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50 p-3.5 dark:border-white/10 dark:bg-black/30 dark:shadow-glass-inset">
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-900 dark:text-white flex items-center space-x-1">
                         <FileText className="h-3 w-3" />
@@ -373,7 +373,7 @@ export default function SourceInspectorDrawer({
                   <h5 className="text-xs font-bold text-zinc-900 dark:text-white mb-2">
                     Raw Source Corpus
                   </h5>
-                  <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-xs text-zinc-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 max-h-[500px] overflow-y-auto font-mono leading-relaxed shadow-inner">
+                  <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-xs text-zinc-800 dark:border-white/10 dark:bg-black/40 dark:text-zinc-200 max-h-[500px] overflow-y-auto font-mono leading-relaxed shadow-inner">
                     <HighlightedContent
                       content={source.content}
                       quote={evidenceQuote}
@@ -385,11 +385,11 @@ export default function SourceInspectorDrawer({
           </div>
 
           {/* Drawer Footer */}
-          <div className="border-t border-zinc-100 bg-zinc-50 px-6 py-3.5 dark:border-zinc-800 dark:bg-zinc-950 flex justify-end">
+          <div className="border-t border-zinc-100 bg-zinc-50 px-6 py-3.5 dark:border-white/5 dark:bg-zinc-950/80 flex justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl bg-zinc-900 px-5 py-2 text-xs font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 shadow-soft"
+              className="rounded-xl bg-zinc-900 px-5 py-2 text-xs font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white dark:hover:shadow-glow-indigo shadow-soft transition-all"
             >
               Done Inspecting
             </button>

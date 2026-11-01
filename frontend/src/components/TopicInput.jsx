@@ -7,6 +7,7 @@ import {
   CalendarClock,
   ListChecks,
   X,
+  Globe,
 } from 'lucide-react';
 
 const CATEGORIES = [
@@ -46,15 +47,18 @@ export default function TopicInput({
   category,
   onCategoryChange,
   onReset,
+  autoDiscoverWeb = true,
+  onToggleAutoDiscover,
+  onAutoDiscoverSources,
 }) {
   return (
-    <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 sm:p-6 shadow-soft dark:border-zinc-800 dark:bg-zinc-900 transition-colors">
+    <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 sm:p-6 shadow-soft dark:border-white/10 dark:bg-zinc-900/40 dark:backdrop-blur-xl dark:shadow-glass-inset transition-colors">
       
       {/* Header section with category dropdown */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-zinc-100 dark:border-zinc-800 pb-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-zinc-100 dark:border-white/5 pb-4">
         <div className="space-y-0.5">
           <div className="flex items-center space-x-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900">
+            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:shadow-glow-indigo">
               <Search className="h-3.5 w-3.5" />
             </span>
             <h2 className="text-base font-bold text-zinc-900 dark:text-white tracking-tight">
@@ -66,21 +70,39 @@ export default function TopicInput({
           </p>
         </div>
 
-        {/* Category Picker */}
-        <div className="flex items-center space-x-2 self-start sm:self-auto">
-          <Tag className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
-          <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Category:</span>
-          <select
-            value={category}
-            onChange={(e) => onCategoryChange(e.target.value)}
-            className="rounded-xl border border-zinc-200/80 bg-zinc-50 px-3 py-1.5 text-xs font-semibold text-zinc-900 focus:border-zinc-900 focus:outline-hidden dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-          >
-            {CATEGORIES.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
+        {/* Category Picker & Auto-Discovery Toggle */}
+        <div className="flex flex-wrap items-center gap-3 self-start sm:self-auto">
+          {typeof onToggleAutoDiscover === 'function' && (
+            <button
+              type="button"
+              onClick={() => onToggleAutoDiscover(!autoDiscoverWeb)}
+              className={`inline-flex items-center space-x-1.5 rounded-xl px-2.5 py-1 text-[11px] font-semibold border transition-all cursor-pointer ${
+                autoDiscoverWeb
+                  ? 'bg-indigo-50 text-indigo-900 border-indigo-200 dark:bg-indigo-950/50 dark:border-indigo-500/30 dark:text-indigo-300'
+                  : 'bg-zinc-100 text-zinc-600 border-zinc-200 dark:bg-zinc-800/60 dark:border-white/10 dark:text-zinc-400'
+              }`}
+              title="Automatically search and scrape relative websites for this topic"
+            >
+              <Globe className={`h-3 w-3 ${autoDiscoverWeb ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-400'}`} />
+              <span>{autoDiscoverWeb ? 'Auto-Web Discovery ON' : 'Manual Sources Only'}</span>
+            </button>
+          )}
+
+          <div className="flex items-center space-x-2">
+            <Tag className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Category:</span>
+            <select
+              value={category}
+              onChange={(e) => onCategoryChange(e.target.value)}
+              className="rounded-xl border border-zinc-200/80 bg-zinc-50 px-3 py-1.5 text-xs font-semibold text-zinc-900 focus:border-zinc-900 focus:outline-hidden dark:border-white/10 dark:bg-black/40 dark:text-zinc-100 dark:shadow-inner"
+            >
+              {CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -92,7 +114,7 @@ export default function TopicInput({
             value={topic}
             onChange={(e) => onTopicChange(e.target.value)}
             placeholder="e.g. What should I verify before applying for the State Post-Matric Scholarship? (Or describe your licensing/academic query...)"
-            className="w-full resize-none rounded-xl border border-zinc-200/80 bg-zinc-50 px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:bg-white focus:outline-hidden font-medium leading-relaxed dark:border-zinc-800 dark:bg-zinc-850 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-zinc-100 transition-all"
+            className="w-full resize-none rounded-xl border border-zinc-200/80 bg-zinc-50 px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-900 focus:bg-white focus:outline-hidden font-medium leading-relaxed dark:border-white/10 dark:bg-black/40 dark:text-zinc-100 dark:placeholder-zinc-600 dark:focus:border-indigo-500/50 dark:focus:ring-1 dark:focus:ring-indigo-500/50 shadow-inner transition-all"
           />
           {topic && (
             <button
@@ -114,10 +136,10 @@ export default function TopicInput({
           return (
             <div
               key={idx}
-              className="rounded-xl border border-zinc-200/60 bg-zinc-50/70 p-3 dark:border-zinc-800 dark:bg-zinc-850/50"
+              className="rounded-xl border border-zinc-200/60 bg-zinc-50/70 p-3 dark:border-white/10 dark:bg-black/30 dark:shadow-glass-inset"
             >
               <div className="flex items-center space-x-2">
-                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
+                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-zinc-200 text-zinc-800 dark:bg-zinc-800/80 dark:border dark:border-white/10 dark:text-zinc-200">
                   <Icon className="h-3.5 w-3.5" />
                 </div>
                 <span className="text-xs font-bold text-zinc-900 dark:text-white truncate">
