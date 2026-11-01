@@ -56,12 +56,27 @@ function MainApp() {
   const [currentSessionId, setCurrentSessionId] = useState(null);
 
   // Research Inputs
-  const [topic, setTopic] = useState(
-    'What should I verify before applying for the State Post-Matric Scholarship?'
-  );
+  const [topic, setTopic] = useState('');
   const [category, setCategory] = useState('Education');
-  const [sources, setSources] = useState(FALLBACK_SCENARIOS[0].sources);
-  const [activeScenarioId, setActiveScenarioId] = useState(FALLBACK_SCENARIOS[0].id);
+  const [sources, setSources] = useState([
+    {
+      id: 'src-1',
+      title: '',
+      url: '',
+      publishedDate: '',
+      sourceType: 'Official Notice',
+      content: '',
+    },
+    {
+      id: 'src-2',
+      title: '',
+      url: '',
+      publishedDate: '',
+      sourceType: 'Third-Party Guide',
+      content: '',
+    },
+  ]);
+  const [activeScenarioId, setActiveScenarioId] = useState(null);
 
   // Analysis Result State
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -308,19 +323,9 @@ function MainApp() {
       }
     } catch (err) {
       console.error('[Analysis Error]', err);
-      // Resilient fallback: only use pre-seeded scenario if explicitly active, otherwise synthesize dynamically
-      const scenarioMatch = activeScenarioId ? FALLBACK_ANALYSES[activeScenarioId] : null;
-      const fallbackAnalysis = scenarioMatch || generateClientDynamicFallback(topic, category, validSources);
-      setAnalysisResult(fallbackAnalysis);
-      setAnalysisMeta({
-        mode: scenarioMatch ? 'Offline Demo Mode (Pre-Verified Engine)' : 'Offline Demo Mode (Dynamic Engine)',
-        modelUsed: 'gaplens-deterministic-fallback',
-        isOfflineDemo: true,
-        fallbackNotice: scenarioMatch
-          ? 'Network timeout occurred. Loaded verified offline analysis dataset.'
-          : 'Network timeout occurred. Synthesized dynamic analysis from submitted sources.',
-      });
-      setCurrentStep(3);
+      setValidationError(
+        err.message || 'AI Analysis failed. Please check your Gemini API key in AI Settings or backend/.env.'
+      );
     } finally {
       setIsAnalyzing(false);
     }

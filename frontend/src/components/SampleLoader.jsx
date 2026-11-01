@@ -8,6 +8,10 @@ import {
 } from 'lucide-react';
 
 export default function SampleLoader({ scenarios, onSelectScenario, activeScenarioId }) {
+  if (!scenarios || scenarios.length === 0) {
+    return null;
+  }
+
   const [copiedNotification, setCopiedNotification] = useState(null);
 
   const handleSelect = (scenario) => {

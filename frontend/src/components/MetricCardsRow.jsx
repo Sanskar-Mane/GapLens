@@ -7,25 +7,19 @@ export default function MetricCardsRow({
 }) {
   const darkSpotsCount = analysis?.informationGaps
     ? String(analysis.informationGaps.length).padStart(2, '0')
-    : sourcesCount > 0
-    ? '03'
     : '00';
 
   const contradictionsCount = analysis?.contradictions
     ? String(analysis.contradictions.length).padStart(2, '0')
-    : sourcesCount > 0
-    ? '02'
     : '00';
 
   const readinessDisplay = analysis?.readinessScore !== undefined
     ? `${analysis.readinessScore}/100`
-    : sourcesCount > 0
-    ? '54/100'
     : '--/100';
 
   const readinessSubtitle = analysis?.readinessLabel
     ? analysis.readinessLabel.slice(0, 32)
-    : 'Requires official verification';
+    : 'Run analysis to calculate readiness';
 
   const metrics = [
     {

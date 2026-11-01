@@ -185,25 +185,30 @@ export const fetchScenarios = async () => {
 };
 
 /**
- * Extract clean readable content from a given URL via backend Jina AI / Cheerio scraper
+ * Extract clean readable content from a given URL via modular extraction engine
  */
-export const extractUrlContent = async (url) => {
+export const extractUrlContent = async (url, renderJs = false) => {
   try {
-    const res = await apiClient.post('/extract-url', { url });
+    const res = await apiClient.post('/extract', { url, renderJs });
     return res.data;
   } catch (err) {
-    return {
-      success: false,
-      error:
-        err.response?.data?.error ||
-        err.response?.data?.message ||
-        'Unable to reach extraction service. Please paste text directly into the Source Content box.',
-    };
+    try {
+      const fallbackRes = await apiClient.post('/extract-url', { url, renderJs });
+      return fallbackRes.data;
+    } catch (fallbackErr) {
+      return {
+        success: false,
+        error:
+          err.response?.data?.error ||
+          err.response?.data?.message ||
+          'Unable to reach extraction service. Please paste text directly into the Source Content box.',
+      };
+    }
   }
 };
 
 /**
- * Search permitted web sources for research topic
+ * Search permitted web sources for research topic (100% Live Mode)
  */
 export const searchWebSources = async (query) => {
   try {
@@ -213,47 +218,8 @@ export const searchWebSources = async (query) => {
     }
     return [];
   } catch (err) {
-    console.warn('[GapLens API] Web search backend offline, providing local reference matches.');
-    const lower = (query || '').toLowerCase();
-    if (lower.includes('scholarship') || lower.includes('matric')) {
-      return [
-        {
-          title: 'State Portal: Post-Matric Scholarship Scheme Guidelines (2026-27)',
-          url: 'https://scholarships.gov.in/post-matric-scholarship-guidelines-2026',
-          snippet:
-            'Annual income criteria must not exceed Rs. 2,50,000. Domicile proof, digital income certificate, marksheet, and Aadhaar-seeded account required for online registration.',
-          suggestedSourceType: 'Official Notice',
-        },
-        {
-          title: 'Student Education Guidance: Post-Matric Application Process & Documents',
-          url: 'https://educareer-guidance.org/state-post-matric-scheme-summary',
-          snippet:
-            'Comprehensive overview of qualifying degrees, income declaration procedures, institutional bonafide submission, and caste validity verification.',
-          suggestedSourceType: 'Third-Party Guide',
-        },
-        {
-          title: 'Directorate of Technical Education: Archived Circular 2023-24',
-          url: 'https://dte-archive.nic.in/circulars/scholarship-verification-2023.pdf',
-          snippet:
-            'Archived instruction mandating offline physical submission of application forms and verified vouchers to the District Nodal Officer on or before Nov 2023.',
-          suggestedSourceType: 'Archived Circular',
-        },
-      ];
-    }
-    return [
-      {
-        title: `Official Regulatory Framework for: ${query}`,
-        url: `https://gov-portal.example/search?q=${encodeURIComponent(query)}`,
-        snippet: `Public notice and compliance circular covering prerequisites and filing deadlines for ${query}.`,
-        suggestedSourceType: 'Official Notice',
-      },
-      {
-        title: `Community Guidelines & Advisory Summary: ${query}`,
-        url: `https://advisory-guide.example/details/${encodeURIComponent(query)}`,
-        snippet: `Advisory summary for applicants navigating paperwork and fee structures for ${query}.`,
-        suggestedSourceType: 'Third-Party Guide',
-      },
-    ];
+    console.warn('[GapLens API] Web search failed or backend offline:', err.message);
+    return [];
   }
 };
 
@@ -304,7 +270,7 @@ export const saveResearchSession = async (sessionData) => {
         if (storedUser) {
           resolvedUserId = JSON.parse(storedUser)?.id || null;
         }
-      } catch {}
+      } catch { }
     }
 
     const payload = {
@@ -658,21 +624,21 @@ export function generateClientDynamicFallback(topic, category = 'General', sourc
 }
 
 /**
- * Run Phase 3 Deep AI Gap-Detection Analysis
- * Calls backend POST /api/analyze with Multi-Model Failover, or returns client dynamic fallback
+ * Run Phase 3 Deep AI Gap-Detection Analysis (100% Live Mode)
+ * Calls backend POST /api/analyze with Multi-Model Failover
  */
 export const runAiAnalysis = async (payload) => {
   const clientKey =
     typeof window !== 'undefined'
       ? localStorage.getItem('gaplens_gemini_key') ||
-        localStorage.getItem('gaplens_openrouter_key') ||
-        ''
+      localStorage.getItem('gaplens_openrouter_key') ||
+      ''
       : '';
   const clientModel =
     typeof window !== 'undefined'
       ? localStorage.getItem('gaplens_gemini_model') ||
-        localStorage.getItem('gaplens_openrouter_model') ||
-        ''
+      localStorage.getItem('gaplens_openrouter_model') ||
+      ''
       : '';
 
   const forceOffline =
@@ -689,32 +655,22 @@ export const runAiAnalysis = async (payload) => {
   };
 
   try {
-    const res = await apiClient.post('/analyze', enrichedPayload, { timeout: 50000 });
+    const res = await apiClient.post('/analyze', enrichedPayload, { timeout: 60000 });
     if (res.data && res.data.analysis) {
       return res.data;
     }
-    throw new Error(res.data?.message || 'Invalid analysis response format');
+    throw new Error(res.data?.message || 'Invalid analysis response format from server');
   } catch (err) {
-    console.warn('[GapLens API] /api/analyze failed, using dynamic client fallback:', err.message);
-
-    // Strictly match predefined scenario or dynamically synthesize from sources
-    const scenarioMatch = matchScenarioAnalysis(payload.topic);
-    const analysis = scenarioMatch || generateClientDynamicFallback(payload.topic, payload.category, payload.sources);
-
-    return {
-      success: true,
-      analysis,
-      meta: {
-        mode: scenarioMatch ? 'Offline Demo Mode (Pre-Verified Engine)' : 'Offline Demo Mode (Dynamic Engine)',
-        modelUsed: 'gaplens-deterministic-fallback',
-        isOfflineDemo: true,
-        timestamp: new Date().toISOString(),
-        sourcesAnalyzed: (payload.sources || []).length,
-        fallbackNotice: scenarioMatch
-          ? 'Executed in Offline Demo Mode. Pre-verified gap detection analysis loaded.'
-          : 'Executed in Offline Dynamic Fallback Mode. Dynamic analysis synthesized from provided sources.',
-      },
-    };
+    console.error('[GapLens API] /api/analyze error:', err.message);
+    const serverMessage =
+      err.response?.data?.message ||
+      err.response?.data?.error ||
+      err.message ||
+      'Analysis request failed';
+    const errorToThrow = new Error(serverMessage);
+    errorToThrow.status = err.response?.status;
+    errorToThrow.response = err.response;
+    throw errorToThrow;
   }
 };
 
@@ -791,7 +747,7 @@ export const fetchSavedSessions = async (userId = null) => {
         if (storedUser) {
           activeUserId = JSON.parse(storedUser)?.id || null;
         }
-      } catch {}
+      } catch { }
     }
 
     const params = activeUserId ? { user_id: activeUserId } : {};
@@ -816,7 +772,7 @@ export const fetchSavedSessions = async (userId = null) => {
         if (storedUser) {
           activeUserId = JSON.parse(storedUser)?.id || null;
         }
-      } catch {}
+      } catch { }
     }
 
     if (!activeUserId) {
@@ -849,7 +805,7 @@ export const patchSessionChecklist = async (sessionId, { checkedIds = [], verifi
         if (storedUser) {
           activeUserId = JSON.parse(storedUser)?.id || null;
         }
-      } catch {}
+      } catch { }
     }
 
     const params = activeUserId ? { user_id: activeUserId } : {};
@@ -898,7 +854,7 @@ export const deleteSavedSession = async (sessionId, userId = null) => {
         if (storedUser) {
           activeUserId = JSON.parse(storedUser)?.id || null;
         }
-      } catch {}
+      } catch { }
     }
 
     const params = activeUserId ? { user_id: activeUserId } : {};
@@ -910,7 +866,7 @@ export const deleteSavedSession = async (sessionId, userId = null) => {
       const history = JSON.parse(localStorage.getItem('gaplens_local_sessions') || '[]');
       const filtered = history.filter((s) => s.id !== sessionId);
       localStorage.setItem('gaplens_local_sessions', JSON.stringify(filtered));
-    } catch {}
+    } catch { }
     return { success: true, storage: 'localStorage' };
   }
 };

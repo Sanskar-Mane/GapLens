@@ -34,27 +34,7 @@ const ipv4HttpsAgent = new https.Agent({
  * Match a topic string against the precomputed scenarios
  */
 function findPrecomputedMatch(topic) {
-  if (!topic || typeof topic !== 'string') return null;
-  const lower = topic.toLowerCase();
-
-  const hasPostMatric = lower.includes('post-matric') || lower.includes('post matric');
-  const hasScholarshipOrMatric = lower.includes('scholarship') || lower.includes('matric');
-  if (hasPostMatric && hasScholarshipOrMatric) {
-    return PRECOMPUTED_ANALYSES['scholarship-2026'];
-  }
-  if (
-    (lower.includes('cloud kitchen') || lower.includes('cloud-kitchen')) &&
-    (lower.includes('fssai') || lower.includes('pune') || lower.includes('license') || lower.includes('licence'))
-  ) {
-    return PRECOMPUTED_ANALYSES['fssai-cloud-kitchen'];
-  }
-  if (
-    (lower.includes('csis') || lower.includes('padho pardesh')) ||
-    (lower.includes('overseas') && (lower.includes('subsidy') || lower.includes('loan')))
-  ) {
-    return PRECOMPUTED_ANALYSES['overseas-edu-subsidy'];
-  }
-
+  // In 100% Live Mode, all requests are analyzed dynamically
   return null;
 }
 
@@ -398,27 +378,18 @@ async function analyzeSourcesWithAI({
     (openRouterKey && openRouterKey.trim()) ||
     (isEnvKeyValid ? envKey.trim() : '');
 
-  // 1. OFFLINE DEMO MODE CHECK
-  if (forceDemoMode || !activeKey) {
-    const matched = findPrecomputedMatch(topic);
-    const analysis = matched || generateDynamicFallbackAnalysis(topic, category, sources);
-
+  // 1. Check API Key (100% Live Mode)
+  if (!activeKey) {
     return {
-      success: true,
-      analysis,
-      meta: {
-        mode: 'Offline Demo Mode (Pre-Verified Engine)',
-        modelUsed: 'gaplens-deterministic-fallback',
-        isOfflineDemo: true,
-        timestamp: new Date().toISOString(),
-        sourcesAnalyzed: sources.length,
-      },
+      success: false,
+      status: 400,
+      message:
+        'Google Gemini API key is missing. Please configure GEMINI_API_KEY in backend/.env or AI Settings.',
     };
   }
 
-  // Prepare fallback data in case live calls fail
-  const precomputedFallback =
-    findPrecomputedMatch(topic) || generateDynamicFallbackAnalysis(topic, category, sources);
+  // Baseline structure for normalization if the LLM output omits optional fields
+  const baselineStructure = generateDynamicFallbackAnalysis(topic, category, sources);
 
   // Build the prioritized model failover queue strictly from .env models
   const queue = [];
@@ -650,7 +621,7 @@ Return strictly the JSON object.`;
       const parsedJSON = cleanAndParseJSON(rawContent);
       const normalizedAnalysis = validateAndNormalizeAnalysis(
         parsedJSON,
-        precomputedFallback
+        baselineStructure
       );
 
       console.log(`[GapLens AI] Successfully audited using: ${modelToTry}`);
@@ -682,27 +653,20 @@ Return strictly the JSON object.`;
     }
   }
 
-  // 4. GRACEFUL FALLBACK IF ALL LIVE MODELS FAIL
-  console.warn(
+  // 4. ERROR IF ALL LIVE MODELS FAIL (100% Live Mode)
+  console.error(
     `[GapLens AI] All live models in failover queue (${attemptedModels.join(
       ', '
-    )}) failed, timed out, or returned unparseable responses. Gracefully activating pre-verified engine.`
+    )}) failed: ${lastError?.message}`
   );
 
   return {
-    success: true,
-    analysis: precomputedFallback,
-    meta: {
-      mode: 'Offline Demo Mode (Pre-Verified Engine)',
-      modelUsed: 'gaplens-deterministic-fallback',
-      isOfflineDemo: true,
-      timestamp: new Date().toISOString(),
-      sourcesAnalyzed: sources.length,
-      fallbackNotice: `Live Google Gemini AI models (${attemptedModels.join(
-        ', '
-      )}) were unavailable, rate-limited, or returned malformed JSON. GapLens transparently served verified audit data to ensure seamless judge evaluation without disruption.`,
-      lastError: lastError?.message,
-    },
+    success: false,
+    status: 502,
+    message: `All live Gemini models failed to respond. Reason: ${
+      lastError?.response?.data?.error?.message || lastError?.message || 'Upstream API error'
+    }. Please verify GEMINI_API_KEY and GEMINI_MODEL in backend/.env.`,
+    attemptedModels,
   };
 }
 

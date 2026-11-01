@@ -12,6 +12,7 @@ const {
   detectTemporalMetadata,
   searchPermittedSources,
 } = require('../services/scraperService');
+const { extractFromUrl } = require('../services/extractor');
 const { analyzeSourcesWithAI } = require('../services/aiAnalysisService');
 
 const router = express.Router();
@@ -69,13 +70,67 @@ router.get('/scenarios', (req, res) => {
 });
 
 /**
+ * POST /api/extract
+ * Modular URL extraction engine returning markdownText and plainText
+ */
+router.post('/extract', async (req, res) => {
+  const { url, renderJs } = req.body;
+  if (!url || typeof url !== 'string' || !url.trim()) {
+    return res.status(400).json({ success: false, error: 'A valid URL is required.' });
+  }
+  try {
+    const result = await extractFromUrl(url.trim(), { forceDynamic: Boolean(renderJs) });
+    return res.json({
+      success: true,
+      title: result.title,
+      markdownText: result.markdownText,
+      plainText: result.plainText,
+      content: result.content || result.markdownText || result.plainText,
+      detectedDate: result.detectedDate,
+      temporalStatus: result.temporalStatus,
+      wordCount: result.wordCount,
+      url: result.url,
+      extractionMethod: result.extractionMethod,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Extraction failed',
+      url: url.trim(),
+    });
+  }
+});
+
+/**
  * POST /api/extract-url
  * Smart multi-tier URL extraction with CAPTCHA/Cloudflare firewall guard and temporal scanning
  */
 router.post('/extract-url', async (req, res) => {
-  const { url } = req.body;
-  const result = await extractUrlContent(url);
-  return res.json(result);
+  const { url, renderJs } = req.body;
+  if (!url || typeof url !== 'string' || !url.trim()) {
+    return res.status(400).json({ success: false, error: 'A valid URL is required.' });
+  }
+  try {
+    const result = await extractFromUrl(url.trim(), { forceDynamic: Boolean(renderJs) });
+    return res.json({
+      success: true,
+      title: result.title,
+      markdownText: result.markdownText,
+      plainText: result.plainText,
+      content: result.content || result.markdownText || result.plainText,
+      detectedDate: result.detectedDate,
+      temporalStatus: result.temporalStatus,
+      wordCount: result.wordCount,
+      url: result.url,
+      extractionMethod: result.extractionMethod,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Extraction failed',
+      url: url.trim(),
+    });
+  }
 });
 
 /**
@@ -773,6 +828,10 @@ router.post('/analyze', async (req, res) => {
       preferredModel: activeModel,
       forceDemoMode: isForceDemo,
     });
+
+    if (!aiResult.success) {
+      return res.status(aiResult.status || 502).json(aiResult);
+    }
 
     // Save session automatically
     let savedSessionId = null;

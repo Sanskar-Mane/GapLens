@@ -32,6 +32,7 @@ export default function SourceCard({
   const [extractError, setExtractError] = useState(null);
   const [extractSuccess, setExtractSuccess] = useState(null);
   const [detectingDate, setDetectingDate] = useState(false);
+  const [viewMode, setViewMode] = useState('markdown');
   const [temporalInfo, setTemporalInfo] = useState({
     temporalStatus: 'undated',
     detectedDate: '',
@@ -74,7 +75,7 @@ export default function SourceCard({
     onUpdateSource(source.id, { [field]: val });
   };
 
-  // Auto-Extract URL content with Jina AI / Cheerio / Firewall guard
+  // Auto-Extract URL content with modular extraction engine
   const handleExtractUrl = async () => {
     if (!source.url || !source.url.trim()) {
       setExtractError('Please enter a valid URL first (e.g. https://...).');
@@ -88,18 +89,20 @@ export default function SourceCard({
     const result = await extractUrlContent(source.url.trim());
     setExtracting(false);
 
-    if (result.success && result.content) {
-      handleFieldChange('content', result.content);
-      if (result.title && (!source.title || source.title.startsWith('Source '))) {
-        handleFieldChange('title', result.title);
-      }
-      if (result.detectedDate && !source.publishedDate) {
-        handleFieldChange('publishedDate', result.detectedDate);
-      }
-      setExtractSuccess(`Extracted ${result.content.length} characters.`);
+    if (result.success && (result.content || result.markdownText || result.plainText)) {
+      const markdown = result.markdownText || result.content;
+      const plain = result.plainText || result.content;
+      onUpdateSource(source.id, {
+        content: viewMode === 'plain' ? plain : markdown,
+        markdownText: markdown,
+        plainText: plain,
+        ...(result.title && (!source.title || source.title.startsWith('Source ')) ? { title: result.title } : {}),
+        ...(result.detectedDate && !source.publishedDate ? { publishedDate: result.detectedDate } : {}),
+      });
+      setExtractSuccess(`Extracted ${markdown.length} characters.`);
       setTimeout(() => setExtractSuccess(null), 4000);
     } else {
-      setExtractError(result.message || 'Failed to extract web content.');
+      setExtractError(result.error || result.message || 'Failed to extract web content.');
     }
   };
 
@@ -328,9 +331,43 @@ export default function SourceCard({
       {/* Content Textarea */}
       <div className="mt-3.5">
         <div className="flex items-center justify-between mb-1">
-          <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-            Source Text Extract (Evidence Corpus)
-          </label>
+          <div className="flex items-center space-x-2">
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+              Source Text Extract (Evidence Corpus)
+            </label>
+            {(source.markdownText || source.plainText) && (
+              <div className="inline-flex rounded-lg border border-zinc-200/80 bg-zinc-100 p-0.5 text-[10px] dark:border-zinc-700 dark:bg-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewMode('markdown');
+                    if (source.markdownText) handleFieldChange('content', source.markdownText);
+                  }}
+                  className={`rounded-md px-2 py-0.5 font-medium transition-colors ${
+                    viewMode === 'markdown'
+                      ? 'bg-white text-zinc-900 shadow-xs dark:bg-zinc-900 dark:text-white'
+                      : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
+                  }`}
+                >
+                  Markdown
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewMode('plain');
+                    if (source.plainText) handleFieldChange('content', source.plainText);
+                  }}
+                  className={`rounded-md px-2 py-0.5 font-medium transition-colors ${
+                    viewMode === 'plain'
+                      ? 'bg-white text-zinc-900 shadow-xs dark:bg-zinc-900 dark:text-white'
+                      : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
+                  }`}
+                >
+                  Plain Text
+                </button>
+              </div>
+            )}
+          </div>
           <span className="text-[10px] font-mono text-zinc-400">
             {wordCount} words &bull; {charCount} chars
           </span>
